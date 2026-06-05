@@ -98,6 +98,13 @@
     }
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@apollo/server": "^5.5.1",
+    "@supabase/supabase-js": "^2.0.0",
+    "axios": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "graphql": "^16.0.0",
+    "multer": "^2.0.0",
+    "square": "^44.1.0"
   }
 }

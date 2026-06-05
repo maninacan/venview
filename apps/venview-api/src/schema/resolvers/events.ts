@@ -1,0 +1,383 @@
+import type { AppContext } from '../../context/index.js';
+import { requireAuth, requireCompanyMember } from '../../context/index.js';
+import { supabase } from '../../lib/supabase.js';
+import { computeProfit } from '../../lib/profit.js';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function assertEventAccess(eventId: string, ctx: AppContext) {
+  requireAuth(ctx);
+  const { data: event } = await supabase
+    .from('EventInfo')
+    .select('companyId')
+    .eq('eventID', eventId)
+    .single();
+  if (!event) throw new Error('Event not found');
+  await requireCompanyMember((event as Record<string, unknown>)['companyId'] as string, ctx.user!.id);
+  return event;
+}
+
+async function buildEventReport(eventId: string) {
+  const [
+    { data: event },
+    { data: sales },
+    { data: expenses },
+    { data: laborRows },
+    { data: supplyRows },
+    { data: additionalFees },
+    { data: inventorySales },
+    { data: permits },
+  ] = await Promise.all([
+    supabase.from('EventInfo').select('*').eq('eventID', eventId).single(),
+    supabase.from('SalesSummary').select('*').eq('eventID', eventId).single(),
+    supabase.from('EventExpenses').select('*').eq('eventID', eventId).single(),
+    supabase.from('EventLabor').select('*').eq('eventID', eventId),
+    supabase.from('EventSupplies').select('*').eq('eventID', eventId),
+    supabase.from('AdditionalFees').select('*').eq('eventID', eventId),
+    supabase.from('InventorySales').select('*').eq('eventID', eventId),
+    supabase.from('Permits').select('*').eq('eventID', eventId),
+  ]);
+
+  if (!event) return null;
+
+  const ev = event as Record<string, unknown>;
+  const hasSquare = !!ev['squareLocationId'];
+  const taxRate = Number((sales as Record<string, unknown> | null)?.['taxRate'] ?? 0);
+
+  // COGS = sum of InventorySales totalCost (recipe-matched costs)
+  const cogs = (inventorySales ?? []).reduce(
+    (sum: number, r: Record<string, unknown>) => sum + Number(r['totalCost'] ?? 0),
+    0
+  );
+
+  const summary = computeProfit(
+    sales as Parameters<typeof computeProfit>[0],
+    expenses as Parameters<typeof computeProfit>[1],
+    (laborRows ?? []) as Parameters<typeof computeProfit>[2],
+    (additionalFees ?? []) as Parameters<typeof computeProfit>[3],
+    cogs,
+    hasSquare,
+    taxRate
+  );
+
+  return {
+    event: {
+      ...ev,
+      id: ev['eventID'],
+      isFinalized: Boolean(ev['isFinalized']),
+      days: [],
+    },
+    sales,
+    expenses: {
+      ...(expenses ?? {}),
+      laborFees: summary.laborFees,
+      additionalFees: summary.additionalFeesTotal,
+      suppliesTotal: (supplyRows ?? []).reduce(
+        (s: number, r: Record<string, unknown>) => s + Number(r['total'] ?? 0), 0
+      ),
+    },
+    taxes: {
+      stateRate: taxRate,
+      stateFoodTax: summary.stateFoodTax,
+      taxDetail: null,
+    },
+    summary,
+    inventorySales: (inventorySales ?? []).map((r: Record<string, unknown>) => ({
+      name: r['name'],
+      quantitySold: r['quantitySold'],
+      unitPrice: r['unitPrice'],
+      totalCost: r['totalCost'],
+    })),
+    laborEntries: (laborRows ?? []).map((r: Record<string, unknown>) => ({
+      id: r['id'],
+      employeeId: r['employeeId'],
+      name: r['name'],
+      hours: r['hours'],
+      wage: r['wage'],
+      total: r['total'] ?? (Number(r['hours'] ?? 0) * Number(r['wage'] ?? 0)),
+    })),
+    supplies: supplyRows ?? [],
+    permits: permits ?? [],
+  };
+}
+
+// Strip DB-only columns not in the GraphQL Event type
+const EVENT_SCHEMA_FIELDS = new Set([
+  'id', 'companyId', 'eventName', 'eventDate', 'endDate', 'status', 'eventType',
+  'eventHost', 'eventLocation', 'coordinator', 'notes', 'zipCode', 'squareLocationId',
+  'time', 'applicationDate', 'eventRating', 'customFields', 'numDays',
+  'isFinalized', 'finalizedDate', 'days', 'netProfit',
+  // joined sub-objects used for inline computation (stripped below)
+  'SalesSummary', 'EventExpenses', 'EventDays',
+]);
+
+function rowToEvent(row: Record<string, unknown>) {
+  const out: Record<string, unknown> = { id: row['eventID'], isFinalized: Boolean(row['isFinalized']), days: [] };
+  for (const key of EVENT_SCHEMA_FIELDS) {
+    if (key in row && key !== 'id' && key !== 'isFinalized' && key !== 'days' &&
+        key !== 'SalesSummary' && key !== 'EventExpenses' && key !== 'EventDays') {
+      out[key] = row[key];
+    }
+  }
+  return out;
+}
+
+// ── Resolvers ─────────────────────────────────────────────────────────────────
+
+export const eventResolvers = {
+  Query: {
+    events: async (
+      _: unknown,
+      { companyId, filter, search }: { companyId: string; filter?: string; search?: string },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      let query = supabase
+        .from('EventInfo')
+        .select('*, SalesSummary(*), EventExpenses(*)')
+        .eq('companyId', companyId)
+        .order('eventDate', { ascending: false });
+
+      if (filter === 'finalized') query = query.eq('isFinalized', true);
+      if (filter === 'notfinalized') query = query.eq('isFinalized', false);
+      if (search) query = query.ilike('eventName', `%${search}%`);
+
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+
+      return (data ?? []).map((row: Record<string, unknown>) => {
+        const sales = (row['SalesSummary'] as Record<string, unknown> | null) ?? {};
+        const exp = (row['EventExpenses'] as Record<string, unknown> | null) ?? {};
+        const hasSquare = !!row['squareLocationId'];
+        const posFees = Number(exp['posFee'] ?? 0) || (hasSquare ? Number(sales['squareFees'] ?? 0) : 0);
+        const netSales = Number(sales['netSales'] ?? row['grossSales'] ?? 0);
+        const netProfit = netSales
+          - Number(exp['healthDeptFee'] ?? 0)
+          - Number(exp['eventFee'] ?? 0)
+          - Number(exp['coordinatorFee'] ?? 0)
+          - Number(exp['employeeBonus'] ?? 0)
+          - Number(exp['eventRunnerFees'] ?? 0)
+          - (Number(exp['mileage'] ?? 0) * Number(exp['mileageRate'] ?? 0.67))
+          - Number(exp['laborFees'] ?? 0)   // denormalized from EventLabor via syncLaborFees
+          - posFees;
+
+        return { ...rowToEvent(row as Record<string, unknown>), netProfit, sales: row['SalesSummary'] ?? null };
+      });
+    },
+
+    event: async (_: unknown, { id }: { id: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      const { data } = await supabase.from('EventInfo').select('*, EventDays(*)').eq('eventID', id).single();
+      if (!data) throw new Error('Event not found');
+      await requireCompanyMember((data as Record<string, unknown>)['companyId'] as string, ctx.user!.id);
+      const row = data as Record<string, unknown>;
+      return {
+        ...rowToEvent(row),
+        days: (row['EventDays'] as unknown[] ?? []).map((d) => {
+          const day = d as Record<string, unknown>;
+          return { id: day['id'], dayNumber: day['dayNumber'], date: day['eventDate'], startTime: day['startTime'], endTime: day['endTime'] };
+        }),
+      };
+    },
+
+    eventReport: async (_: unknown, { id }: { id: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      await assertEventAccess(id, ctx);
+      const report = await buildEventReport(id);
+      if (!report) throw new Error('Event not found');
+      return report;
+    },
+
+    eventKpi: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      const { data } = await supabase
+        .from('EventInfo')
+        .select('isFinalized, SalesSummary(grossSales, netSales, squareFees), EventExpenses(*), squareLocationId')
+        .eq('companyId', companyId);
+
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      let grossSales = 0;
+      let netSales = 0;
+      let finalizedCount = 0;
+
+      for (const r of rows) {
+        if (r['isFinalized']) finalizedCount++;
+        const s = (r['SalesSummary'] as Record<string, unknown> | null) ?? {};
+        grossSales += Number(s['grossSales'] ?? 0);
+        netSales   += Number(s['netSales']   ?? 0);
+      }
+
+      return {
+        totalEvents: rows.length,
+        finalizedCount,
+        grossSales,
+        netSales,
+      };
+    },
+
+    eventTrend: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      const { data } = await supabase
+        .from('EventInfo')
+        .select('eventID, eventName, eventDate, squareLocationId, SalesSummary(*), EventExpenses(*)')
+        .eq('companyId', companyId)
+        .order('eventDate', { ascending: true });
+
+      return (data ?? []).map((r: Record<string, unknown>) => {
+        const s = (r['SalesSummary'] as Record<string, unknown> | null) ?? {};
+        const exp = (r['EventExpenses'] as Record<string, unknown> | null) ?? {};
+        const hasSquare = !!r['squareLocationId'];
+        const posFees = Number(exp['posFee'] ?? 0) || (hasSquare ? Number(s['squareFees'] ?? 0) : 0);
+        const netSales = Number(s['netSales'] ?? 0);
+        const netProfit = netSales
+          - Number(exp['healthDeptFee'] ?? 0)
+          - Number(exp['eventFee'] ?? 0)
+          - Number(exp['coordinatorFee'] ?? 0)
+          - Number(exp['employeeBonus'] ?? 0)
+          - Number(exp['eventRunnerFees'] ?? 0)
+          - (Number(exp['mileage'] ?? 0) * Number(exp['mileageRate'] ?? 0.67))
+          - posFees;
+
+        return {
+          eventId: r['eventID'],
+          name: r['eventName'],
+          date: r['eventDate'],
+          netProfit,
+        };
+      });
+    },
+  },
+
+  Mutation: {
+    createEvent: async (
+      _: unknown,
+      { companyId, input }: { companyId: string; input: Record<string, unknown> },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      const { days, ...eventFields } = input;
+
+      const { data: event, error } = await supabase
+        .from('EventInfo')
+        .insert({ ...eventFields, companyId, userId: ctx.user!.id, createdAt: new Date().toISOString() })
+        .select()
+        .single();
+
+      if (error || !event) throw new Error(error?.message ?? 'Failed to create event');
+
+      const eventID = (event as Record<string, unknown>)['eventID'] as string;
+
+      // Insert EventExpenses placeholder
+      await supabase.from('EventExpenses').insert({ eventID });
+
+      // Insert days if provided
+      if (Array.isArray(days) && days.length > 0) {
+        await supabase.from('EventDays').insert(
+          (days as Array<Record<string, unknown>>).map(d => ({ ...d, eventID }))
+        );
+      }
+
+      return rowToEvent(event as Record<string, unknown>);
+    },
+
+    updateEvent: async (
+      _: unknown,
+      { id, input }: { id: string; input: Record<string, unknown> },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await assertEventAccess(id, ctx);
+
+      const { days, ...eventFields } = input;
+
+      const { data, error } = await supabase
+        .from('EventInfo')
+        .update(eventFields)
+        .eq('eventID', id)
+        .select()
+        .single();
+
+      if (error || !data) throw new Error(error?.message ?? 'Failed to update event');
+
+      if (Array.isArray(days)) {
+        await supabase.from('EventDays').delete().eq('eventID', id);
+        if (days.length > 0) {
+          await supabase.from('EventDays').insert(
+            (days as Array<Record<string, unknown>>).map(d => ({ ...d, eventID: id }))
+          );
+        }
+      }
+
+      return rowToEvent(data as Record<string, unknown>);
+    },
+
+    deleteEvent: async (_: unknown, { id }: { id: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      await assertEventAccess(id, ctx);
+      await supabase.from('EventInfo').delete().eq('eventID', id);
+      return true;
+    },
+
+    finalizeEvent: async (_: unknown, { id }: { id: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      const eventAccess = await assertEventAccess(id, ctx);
+      const companyId = (eventAccess as Record<string, unknown>)['companyId'] as string;
+
+      // Check company plan for Starter limit (1 finalized event)
+      const { data: company } = await supabase
+        .from('Companies')
+        .select('plan')
+        .eq('id', companyId)
+        .single();
+
+      if ((company as Record<string, unknown> | null)?.['plan'] === 'starter') {
+        const { count } = await supabase
+          .from('EventInfo')
+          .select('eventID', { count: 'exact', head: true })
+          .eq('companyId', companyId)
+          .eq('isFinalized', true);
+
+        if ((count ?? 0) >= 1) {
+          throw new Error('FINALIZE_LIMIT_REACHED: Starter plan allows 1 finalized event. Upgrade to Pro.');
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('EventInfo')
+        .update({ isFinalized: true, finalizedDate: new Date().toISOString().split('T')[0] })
+        .eq('eventID', id)
+        .select()
+        .single();
+
+      if (error || !data) throw new Error(error?.message ?? 'Failed to finalize event');
+      return rowToEvent(data as Record<string, unknown>);
+    },
+
+    claimUnownedEvents: async (
+      _: unknown,
+      { companyId }: { companyId: string },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      const { data, error } = await supabase
+        .from('EventInfo')
+        .update({ companyId })
+        .eq('userId', ctx.user!.id)
+        .is('companyId', null)
+        .select('eventID');
+
+      if (error) throw new Error(error.message);
+      return (data ?? []).length;
+    },
+  },
+};

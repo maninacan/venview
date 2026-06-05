@@ -48,3 +48,8 @@ Thumbs.db
 .nx/polygraph
 .nx/self-healing
 vite.config.*.timestamp*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
