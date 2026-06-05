@@ -39,38 +39,38 @@ export function AlertsBell({ companyId }: Props) {
 
   return (
     <>
-      <button className="alerts-bell" onClick={() => setOpen(o => !o)} aria-label="Reorder alerts">
+      <button
+        className="relative bg-transparent border-0 text-[rgba(255,255,255,0.82)] text-[1.1rem] cursor-pointer px-2.5 py-1.5 rounded-md ml-1 transition-colors hover:bg-[rgba(255,255,255,0.12)]"
+        onClick={() => setOpen(o => !o)}
+        aria-label="Reorder alerts"
+      >
         🔔
-        {unread > 0 && <span className="alerts-badge">{unread}</span>}
+        {unread > 0 && (
+          <span className="absolute top-0.5 right-0.5 bg-[#dc2626] text-white text-[0.62rem] font-bold min-w-[15px] h-[15px] rounded-full flex items-center justify-center px-[3px]">
+            {unread}
+          </span>
+        )}
       </button>
 
       {open && (
         <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 199 }}
-            onClick={() => setOpen(false)}
-          />
-          <div className="alerts-panel">
-            <div className="alerts-panel-header">
+          <div className="fixed inset-0 z-[199]" onClick={() => setOpen(false)} />
+          <div className="fixed top-16 right-4 bg-white border border-[rgba(11,42,74,0.12)] rounded-xl w-[300px] max-h-[380px] overflow-y-auto z-[200] shadow-[0_12px_30px_rgba(11,42,74,0.12)]">
+            <div className="flex items-center px-3.5 py-3 border-b border-[#dde3f0] gap-2 text-[0.88rem] font-semibold">
               <strong>Reorder Alerts</strong>
-              <button className="alerts-mark-all" onClick={() => markAll()}>Mark all read</button>
-              <button className="alerts-close" onClick={() => setOpen(false)}>✕</button>
+              <button className="ml-auto bg-transparent border-0 text-[#0B2A4A] text-[0.78rem] cursor-pointer" onClick={() => markAll()}>Mark all read</button>
+              <button className="bg-transparent border-0 text-[#64748b] cursor-pointer text-[0.95rem]" onClick={() => setOpen(false)}>✕</button>
             </div>
             {alerts.length === 0 ? (
-              <p className="alerts-empty">No reorder alerts.</p>
+              <p className="px-3.5 py-4 text-[#64748b] text-[0.84rem]">No reorder alerts.</p>
             ) : (
               alerts.map((a: { id: string; isRead: boolean; item: { name: string }; triggeredAt: string }) => (
                 <div
                   key={a.id}
-                  style={{
-                    padding: '10px 14px',
-                    borderBottom: '1px solid #f1f5f9',
-                    fontSize: '0.84rem',
-                    opacity: a.isRead ? 0.5 : 1,
-                  }}
+                  className={`px-3.5 py-2.5 border-b border-[#f1f5f9] text-[0.84rem] ${a.isRead ? 'opacity-50' : ''}`}
                 >
                   <strong>{a.item.name}</strong> is low on stock
-                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 2 }}>
+                  <div className="text-[0.75rem] text-[#64748b] mt-0.5">
                     {new Date(a.triggeredAt).toLocaleDateString()}
                   </div>
                 </div>

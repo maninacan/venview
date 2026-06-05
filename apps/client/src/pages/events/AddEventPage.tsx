@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 // ── Canonical field → DB key mapping (ported from old app) ───────────────────
 const CANONICAL_LABEL_TO_DBKEY: Record<string, string> = {

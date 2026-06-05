@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_RECIPES = gql`
   query GetRecipes($companyId: ID!) {
@@ -118,11 +118,11 @@ export function RecipesPage() {
           </p>
         )}
 
-        <div className="recipes-grid">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-3.5 mt-3.5">
           {recipes.map(recipe => (
-            <div key={recipe.id} className="recipe-card">
-              <div className="recipe-card-name">{recipe.name}</div>
-              <div className="recipe-card-cost">${Number(recipe.totalCost).toFixed(4)}/batch · {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? 's' : ''}</div>
+            <div key={recipe.id} className="bg-white border border-[rgba(11,42,74,0.12)] rounded-xl p-4 transition-shadow hover:shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
+              <div className="text-[0.97rem] font-bold text-[#0B2A4A] mb-1">{recipe.name}</div>
+              <div className="text-[0.82rem] text-[#64748b]">${Number(recipe.totalCost).toFixed(4)}/batch · {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? 's' : ''}</div>
               <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                 <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => openEdit(recipe)}>✏️ Edit</button>
                 <button className="btn-danger-subtle" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => handleDelete(recipe.id, recipe.name)}>🗑</button>

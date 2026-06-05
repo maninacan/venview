@@ -1,27 +1,13 @@
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { useQuery } from '@apollo/client/react';
-import { gql } from '@apollo/client/core';
-
-const GET_ME = gql`
-  query GetMe {
-    me { id isAdmin }
-  }
-`;
-
 export function CompanyLayout() {
   const { companyId, company } = useCurrentCompany();
-  const { data } = useQuery(GET_ME);
 
   return (
-    <div className="app-shell">
-      <Header
-        companyId={companyId ?? undefined}
-        companyName={company?.name}
-        isAdmin={data?.me?.isAdmin}
-      />
-      <main>
+    <div className="min-h-screen flex flex-col">
+      <Header companyId={companyId ?? undefined} companyName={company?.name} />
+      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-6">
         <Outlet />
       </main>
     </div>
@@ -29,12 +15,10 @@ export function CompanyLayout() {
 }
 
 export function RootLayout() {
-  const { data } = useQuery(GET_ME);
-
   return (
-    <div className="app-shell">
-      <Header isAdmin={data?.me?.isAdmin} />
-      <main>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-6">
         <Outlet />
       </main>
     </div>

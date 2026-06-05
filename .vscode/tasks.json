@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "Start: All Apps",
-      "dependsOn": ["Start: Client", "Start: API", "Start: Marketing"],
+      "dependsOn": ["Start: Client", "Start: API", "Start: Marketing", "Start: Super Admin"],
       "dependsOrder": "parallel",
       "group": {
         "kind": "build",
@@ -62,6 +62,24 @@
           "activeOnStart": true,
           "beginsPattern": "astro",
           "endsPattern": "localhost"
+        }
+      }
+    },
+    {
+      "label": "Start: Super Admin",
+      "type": "npm",
+      "script": "start:super-admin",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE",
+          "endsPattern": "Local:"
         }
       }
     }

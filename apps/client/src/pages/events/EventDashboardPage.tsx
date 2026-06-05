@@ -5,7 +5,7 @@ import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { CollapsibleCard } from '../../components/dashboard/CollapsibleCard';
 import { ProfitSummaryCard } from '../../components/dashboard/ProfitSummaryCard';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_REPORT = gql`
   query GetEventReport($id: ID!) {
@@ -120,37 +120,37 @@ export function EventDashboardPage() {
   return (
     <>
       {/* Dashboard header */}
-      <div style={{ marginBottom: 16 }}>
-        <div className="dashboard-title-row">
-          <div className="event-title">{event?.eventName}</div>
+      <div className="mb-4">
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <div className="text-[1.35rem] font-bold text-[#0B2A4A]">{event?.eventName}</div>
           {event?.isFinalized && <span className="finalized-badge-large">FINALIZED</span>}
         </div>
-        <div className="event-date">{formatDateRange(event?.eventDate, event?.numDays)}</div>
+        <div className="text-[0.88rem] text-[#64748b] font-medium mb-1.5">{formatDateRange(event?.eventDate, event?.numDays)}</div>
         {event?.finalizedDate && (
-          <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: 2 }}>
+          <div className="text-[0.78rem] text-[#64748b] mt-0.5">
             Finalized on: {formatDate(event.finalizedDate)}
           </div>
         )}
 
         {metaFields.length > 0 && (
-          <div className="dashboard-meta">
+          <div className="flex flex-wrap gap-[7px] mt-2">
             {metaFields.map(f => (
-              <span key={f.label} className="meta-chip">
-                <span className="meta-chip-label">{f.label}</span>
-                <span className="meta-chip-value">{f.value}</span>
+              <span key={f.label} className="inline-flex items-center gap-1 bg-[#f1f5f9] rounded-full px-2.5 py-[3px] text-[0.78rem]">
+                <span className="text-[#64748b] font-medium">{f.label}</span>
+                <span className="text-[#0B2A4A] font-semibold">{f.value}</span>
               </span>
             ))}
           </div>
         )}
 
         {/* Action buttons */}
-        <div className="dashboard-buttons" style={{ marginTop: 14 }}>
-          <div className="dash-btn-row">
+        <div className="flex flex-col gap-[7px] mb-[18px] mt-3.5">
+          <div className="flex flex-wrap gap-2 items-center">
             <SyncSquareSalesButton eventId={eventId!} squareLocationId={event?.squareLocationId} onSynced={refetch} />
-            <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary" style={{ textDecoration: 'none' }}>✏️ Edit Event</Link>
-            <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary" style={{ textDecoration: 'none' }}>📊 Post-Event Report</Link>
+            <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary">✏️ Edit Event</Link>
+            <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary">📊 Post-Event Report</Link>
           </div>
-          <div className="dash-btn-row dash-btn-row--danger">
+          <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-[#f1f5f9] mt-0.5">
             <button className="btn-danger-subtle" onClick={handleDelete}>🗑 Delete Event</button>
           </div>
         </div>
@@ -203,7 +203,7 @@ export function EventDashboardPage() {
 
       {/* 5. Labor */}
       <CollapsibleCard title="Labor" headerRight={
-        <button className="btn-secondary labor-square-btn" onClick={() => showToast('Square labor sync coming in Phase 4', 'info')} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
+        <button className="btn-secondary ml-auto" onClick={() => showToast('Square labor sync coming in Phase 4', 'info')} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
           Pull Square Labor
         </button>
       }>
@@ -404,16 +404,20 @@ function LaborSection({ eventId, companyId, laborEntries, onSaved }: { eventId: 
   return (
     <div>
       {laborEntries.length > 0 && (
-        <table className="labor-table">
-          <thead><tr><th>Name</th><th>Hours</th><th>Wage</th><th>Total</th><th></th></tr></thead>
+        <table className="w-full border-collapse text-[0.86rem] mt-2">
+          <thead><tr>
+            {['Name', 'Hours', 'Wage', 'Total', ''].map(h => (
+              <th key={h} className="px-2 py-1.5 text-left text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.04em] border-b border-[#dde3f0]">{h}</th>
+            ))}
+          </tr></thead>
           <tbody>
             {laborEntries.map(r => (
               <tr key={r['id'] as string}>
-                <td>{r['name'] as string}</td>
-                <td>{Number(r['hours']).toFixed(2)}</td>
-                <td>${Number(r['wage']).toFixed(2)}/hr</td>
-                <td style={{ fontWeight: 600 }}>${Number(r['total']).toFixed(2)}</td>
-                <td><button onClick={() => removeShift(r['id'] as string)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button></td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">{r['name'] as string}</td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">{Number(r['hours']).toFixed(2)}</td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">${Number(r['wage']).toFixed(2)}/hr</td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle font-semibold">${Number(r['total']).toFixed(2)}</td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle"><button onClick={() => removeShift(r['id'] as string)} className="bg-transparent border-0 text-[#dc2626] cursor-pointer text-[0.85rem]">✕</button></td>
               </tr>
             ))}
           </tbody>

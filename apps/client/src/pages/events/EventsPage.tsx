@@ -4,7 +4,7 @@ import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_EVENTS = gql`
   query GetEvents($companyId: ID!, $filter: String, $search: String) {
@@ -103,23 +103,18 @@ export function EventsPage() {
 
         {/* KPI chips */}
         {kpi && (
-          <div className="kpi-row">
-            <div className="kpi-chip">
-              <span className="kpi-chip-label">Total Events</span>
-              <span className="kpi-chip-value">{kpi.totalEvents}</span>
-            </div>
-            <div className="kpi-chip">
-              <span className="kpi-chip-label">Finalized</span>
-              <span className="kpi-chip-value">{kpi.finalizedCount}</span>
-            </div>
-            <div className="kpi-chip">
-              <span className="kpi-chip-label">Gross Sales</span>
-              <span className="kpi-chip-value">{fmt(kpi.grossSales)}</span>
-            </div>
-            <div className="kpi-chip">
-              <span className="kpi-chip-label">Net Sales</span>
-              <span className="kpi-chip-value">{fmt(kpi.netSales)}</span>
-            </div>
+          <div className="flex gap-3.5 flex-wrap mb-5">
+            {([
+              { label: 'Total Events', value: kpi.totalEvents },
+              { label: 'Finalized', value: kpi.finalizedCount },
+              { label: 'Gross Sales', value: fmt(kpi.grossSales) },
+              { label: 'Net Sales', value: fmt(kpi.netSales) },
+            ] as { label: string; value: string | number }[]).map(chip => (
+              <div key={chip.label} className="bg-white border border-[rgba(11,42,74,0.12)] rounded-[10px] px-[18px] py-3 flex-1 min-w-[130px]">
+                <span className="text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.05em] block mb-[3px]">{chip.label}</span>
+                <span className="text-[1.4rem] font-bold text-[#0B2A4A]">{chip.value}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -149,7 +144,7 @@ export function EventsPage() {
         )}
 
         {/* Filter + search bar */}
-        <div className="manage-filter-bar">
+        <div className="flex gap-2 mb-3.5 flex-wrap">
           {(['all', 'finalized', 'notfinalized'] as FilterType[]).map(f => (
             <button
               key={f}
@@ -162,7 +157,7 @@ export function EventsPage() {
           ))}
         </div>
 
-        <div className="search-fields">
+        <div className="flex gap-2 flex-wrap mb-4 items-end">
           <input
             type="text"
             placeholder="Event name"
@@ -174,49 +169,50 @@ export function EventsPage() {
           <button className="btn-secondary" onClick={handleSearch}>🔍 Search</button>
           <button className="btn-secondary" onClick={clearSearch}>🧹 Clear</button>
           <button className="btn-secondary" onClick={exportCSV}>📥 Export CSV</button>
-          <Link to={`/companies/${companyId}/events/new`} className="btn-primary" style={{ marginLeft: 'auto', textDecoration: 'none' }}>
+          <Link to={`/companies/${companyId}/events/new`} className="btn-primary ml-auto">
             + Add Event
           </Link>
         </div>
 
         {/* Events table */}
-        <div className="table-container">
+        <div className="overflow-x-auto">
           {eventsLoading ? (
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem', padding: '16px 0' }}>Loading events…</p>
+            <p className="text-[#64748b] text-[0.88rem] py-4">Loading events…</p>
           ) : events.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem', padding: '16px 0', textAlign: 'center' }}>
-              No events found. <Link to={`/companies/${companyId}/events/new`} style={{ color: 'var(--vv-navy)', fontWeight: 600 }}>Add your first event →</Link>
+            <p className="text-[#64748b] text-[0.88rem] py-4 text-center">
+              No events found. <Link to={`/companies/${companyId}/events/new`} className="text-[#0B2A4A] font-semibold">Add your first event →</Link>
             </p>
           ) : (
-            <table className="events-table">
+            <table className="w-full border-collapse text-[0.87rem]">
               <thead>
                 <tr>
-                  <th>Event Name</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Gross Sales</th>
-                  <th>Net Profit</th>
-                  <th>Finalized</th>
+                  {['Event Name', 'Date', 'Status', 'Gross Sales', 'Net Profit', 'Finalized'].map(h => (
+                    <th key={h} className="px-3 py-[9px] text-left text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.05em] border-b-2 border-[#dde3f0] whitespace-nowrap">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {events.map((e: Record<string, unknown>) => (
-                  <tr key={e['id'] as string} onClick={() => navigate(`/companies/${companyId}/events/${e['id']}`)}>
-                    <td style={{ fontWeight: 600 }}>{e['eventName'] as string}</td>
-                    <td>{formatDate(e['eventDate'] as string)}</td>
-                    <td>
-                      <span style={{ fontSize: '0.8rem', background: '#f1f5f9', padding: '2px 8px', borderRadius: 99 }}>
+                  <tr
+                    key={e['id'] as string}
+                    className="cursor-pointer hover:[&>td]:bg-[#f8fafc]"
+                    onClick={() => navigate(`/companies/${companyId}/events/${e['id']}`)}
+                  >
+                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle font-semibold">{e['eventName'] as string}</td>
+                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">{formatDate(e['eventDate'] as string)}</td>
+                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">
+                      <span className="text-[0.8rem] bg-[#f1f5f9] px-2 py-[2px] rounded-full">
                         {(e['status'] as string) || '—'}
                       </span>
                     </td>
-                    <td>{fmt((e as { sales?: { grossSales?: number } })['sales']?.grossSales)}</td>
-                    <td style={{ color: Number(e['netProfit']) >= 0 ? '#166534' : '#991b1b', fontWeight: 600 }}>
+                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">{fmt((e as { sales?: { grossSales?: number } })['sales']?.grossSales)}</td>
+                    <td className={`px-3 py-[11px] border-b border-[#f1f5f9] align-middle font-semibold ${Number(e['netProfit']) >= 0 ? 'text-[#166534]' : 'text-[#991b1b]'}`}>
                       {fmt(e['netProfit'] as number)}
                     </td>
-                    <td>
+                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">
                       {e['isFinalized']
                         ? <span className="finalized-badge-large">FINALIZED</span>
-                        : <span style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>No</span>}
+                        : <span className="text-[#64748b] text-[0.82rem]">No</span>}
                     </td>
                   </tr>
                 ))}

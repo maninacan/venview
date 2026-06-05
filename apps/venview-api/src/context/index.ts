@@ -1,34 +1,29 @@
 import type { Request } from 'express';
 import { supabase } from '../lib/supabase.js';
 
-const ADMIN_EMAILS = (process.env['ADMIN_EMAILS'] || '')
-  .split(',')
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
 export interface AppContext {
   user: { id: string; email: string } | null;
-  isAdmin: boolean;
+  isSuperAdmin: boolean;
 }
 
 export async function createContext(req: Request): Promise<AppContext> {
   const authHeader = req.headers['authorization'];
   if (!authHeader?.startsWith('Bearer ')) {
-    return { user: null, isAdmin: false };
+    return { user: null, isSuperAdmin: false };
   }
 
   const token = authHeader.slice(7);
   try {
     const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data.user) return { user: null, isAdmin: false };
+    if (error || !data.user) return { user: null, isSuperAdmin: false };
 
     const email = data.user.email ?? '';
     return {
       user: { id: data.user.id, email },
-      isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
+      isSuperAdmin: data.user.app_metadata?.['role'] === 'super_admin',
     };
   } catch {
-    return { user: null, isAdmin: false };
+    return { user: null, isSuperAdmin: false };
   }
 }
 

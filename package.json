@@ -10,7 +10,9 @@
     "build": "doppler run -- nx run-many -t build -p client venview-api marketing --parallel=3",
     "build:client": "doppler run -- nx build client",
     "build:api": "nx build venview-api",
-    "build:marketing": "doppler run -- nx build marketing"
+    "build:marketing": "doppler run -- nx build marketing",
+    "start:super-admin": "doppler run -- nx serve super-admin-portal",
+    "build:super-admin": "doppler run -- nx build super-admin-portal"
   },
   "private": true,
   "devDependencies": {
@@ -61,17 +63,27 @@
     "@apollo/client": "^4.2.2",
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
+    "@headlessui/react": "^2.2.10",
+    "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.107.0",
     "axios": "^1.17.0",
+    "classnames": "^2.5.1",
     "cors": "^2.8.6",
+    "d3-scale": "^4.0.2",
     "express": "^5.2.1",
     "graphql": "^16.14.1",
     "multer": "^2.1.1",
     "pdfmake": "^0.3.9",
+    "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.17.0",
+    "react-simple-maps": "^3.0.0",
     "recharts": "^3.8.1",
-    "square": "^44.1.0"
+    "rxjs": "^7.8.2",
+    "simplebar": "^6.3.3",
+    "simplebar-react": "^3.3.2",
+    "square": "^44.1.0",
+    "zipcodes": "^8.0.0"
   }
 }

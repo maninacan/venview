@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { CompanyCard, CompanyCardSkeleton } from '../../components/companies/CompanyCard';
 import { WelcomeModal } from '../../components/modals/WelcomeModal';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_MY_COMPANIES = gql`
   query GetMyCompanies {
@@ -66,34 +66,36 @@ export function CompaniesPage() {
 
   return (
     <>
-      <div className="companies-page-header">
-        <h1>
-          {data?.me ? `Welcome back!` : 'My Companies'}
+      <div className="mb-2">
+        <h1 className="text-[1.5rem] font-bold text-[#0B2A4A] mt-0 mb-1">
+          {data?.me ? 'Welcome back!' : 'My Companies'}
         </h1>
-        <p>Select a company to manage its events, inventory, and recipes.</p>
+        <p className="text-[#64748b] text-[0.9rem] m-0">Select a company to manage its events, inventory, and recipes.</p>
       </div>
 
-      <div className="companies-grid">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-[18px] mt-6">
         {loading && [0, 1, 2].map(i => <CompanyCardSkeleton key={i} />)}
 
         {!loading && companies.map((c: Parameters<typeof CompanyCard>[0]['company']) => (
           <CompanyCard key={c.id} company={c} />
         ))}
 
-        {/* Add company card */}
-        <Link to="/companies/new" className="add-company-card">
-          <span className="add-company-icon">+</span>
+        <Link
+          to="/companies/new"
+          className="bg-[#f8fafc] border-2 border-dashed border-[rgba(11,42,74,0.12)] rounded-[14px] p-[22px] min-h-[150px] flex flex-col items-center justify-center gap-2 cursor-pointer no-underline text-[#64748b] font-semibold text-[0.9rem] transition-[border-color,background,color] hover:border-[#0B2A4A] hover:bg-[#eff6ff] hover:text-[#0B2A4A]"
+        >
+          <span className="text-[1.8rem] opacity-40">+</span>
           Create a new company
         </Link>
       </div>
 
-      <div className="companies-actions">
+      <div className="flex gap-3 mt-7 flex-wrap">
         {!showJoinForm ? (
           <button className="btn-secondary" onClick={() => setShowJoinForm(true)}>
             🔗 Join a company
           </button>
         ) : (
-          <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <form onSubmit={handleJoin} className="flex gap-2 items-center flex-wrap">
             <input
               type="text"
               placeholder="Enter join code (e.g. ABC123)"

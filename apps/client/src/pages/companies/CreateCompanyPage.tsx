@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const CREATE_COMPANY = gql`
   mutation CreateCompany($input: CreateCompanyInput!) {

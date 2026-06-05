@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@org/data';
 
 type AuthMode = 'signin' | 'signup';
 
@@ -93,23 +93,30 @@ export function AuthPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-container">
-        <div className="auth-card">
-          <div className="auth-brand">
-            <span className="brand-title">Venview Events</span>
-            <span className="brand-subtitle">Vendor Intelligence for Events</span>
+    <div className="min-h-screen flex items-center justify-center bg-[#F6FBFF] p-6">
+      <div className="w-full max-w-[420px]">
+        <div className="bg-white rounded-[20px] p-10 shadow-[0_12px_30px_rgba(11,42,74,0.12)] border border-[rgba(11,42,74,0.12)]">
+          <div className="text-center mb-7">
+            <span
+              className="block text-[1.7rem] text-[#0B2A4A] font-normal"
+              style={{ fontFamily: "'DM Serif Display', serif" }}
+            >
+              Venview Events
+            </span>
+            <span className="block text-[0.8rem] text-[#64748b] mt-0.5">Vendor Intelligence for Events</span>
           </div>
 
-          <h2 className="auth-h2">{mode === 'signin' ? 'Sign In' : 'Sign Up'}</h2>
-          <p className="auth-subtitle">
+          <h2 className="mt-0 mb-1.5 text-[1.25rem] font-bold text-[#0B2A4A]">
+            {mode === 'signin' ? 'Sign In' : 'Sign Up'}
+          </h2>
+          <p className="mt-0 mb-5 text-[0.88rem] text-[#64748b]">
             {mode === 'signin'
               ? 'Welcome back! Sign in to manage your events.'
               : 'Create your account to get started.'}
           </p>
 
           <form onSubmit={handleAuth}>
-            <div className="auth-fields">
+            <div className="flex flex-col gap-3 mb-4">
               <input
                 type="email"
                 placeholder="Email address"
@@ -127,23 +134,31 @@ export function AuthPage() {
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               />
             </div>
-            <div className="auth-error">{error}</div>
-            <button type="submit" className="btn-primary auth-submit" disabled={loading}>
+            <div className="text-[#dc2626] text-[0.85rem] min-h-5 mb-2">{error}</div>
+            <button type="submit" className="btn-primary w-full justify-center py-[11px] text-base" disabled={loading}>
               {loading && <span className="spinner" />}
               {mode === 'signin' ? 'Sign In' : 'Sign Up'}
             </button>
           </form>
 
-          <p className="auth-toggle">
+          <p className="text-center text-[0.85rem] text-[#64748b] mt-3.5">
             {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-            <a href="#" onClick={e => { e.preventDefault(); setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(''); }}>
+            <a
+              href="#"
+              className="text-[#0B2A4A] font-semibold no-underline hover:underline"
+              onClick={e => { e.preventDefault(); setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(''); }}
+            >
               {mode === 'signin' ? 'Sign Up' : 'Sign In'}
             </a>
           </p>
 
           {mode === 'signin' && (
-            <p className="auth-toggle">
-              <a href="#" onClick={e => { e.preventDefault(); setResetEmail(email); setShowForgot(true); }} style={{ fontSize: '0.82em', color: 'var(--muted)' }}>
+            <p className="text-center text-[0.85rem] text-[#64748b] mt-2">
+              <a
+                href="#"
+                className="text-[0.82em] text-[#64748b] no-underline hover:underline"
+                onClick={e => { e.preventDefault(); setResetEmail(email); setShowForgot(true); }}
+              >
                 Forgot Password?
               </a>
             </p>

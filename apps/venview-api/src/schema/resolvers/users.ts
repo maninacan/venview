@@ -20,7 +20,7 @@ export const userResolvers = {
       return {
         id: ctx.user.id,
         email: ctx.user.email,
-        isAdmin: ctx.isAdmin,
+        isSuperAdmin: ctx.isSuperAdmin,
         companies: companyList,
       };
     },

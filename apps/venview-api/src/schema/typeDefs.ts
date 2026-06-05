@@ -6,7 +6,7 @@ export const typeDefs = `#graphql
   type Me {
     id: ID!
     email: String!
-    isAdmin: Boolean!
+    isSuperAdmin: Boolean!
     companies: [Company!]!
   }
 
@@ -422,6 +422,67 @@ export const typeDefs = `#graphql
     memberCount: Int!
   }
 
+  type MonthCount {
+    month: String!
+    count: Int!
+  }
+
+  type ZipCount {
+    zipCode: String!
+    count: Int!
+  }
+
+  type StateCount {
+    state: String!
+    count: Int!
+  }
+
+  type CompanyLocation {
+    id: ID!
+    name: String!
+    plan: String!
+    lat: Float!
+    lng: Float!
+    city: String
+    zipCode: String
+    eventCount: Int!
+    memberCount: Int!
+  }
+
+  type AdminDashboard {
+    # Totals
+    totalUsers: Int!
+    totalCompanies: Int!
+    totalEvents: Int!
+    totalFinalizedEvents: Int!
+    # Growth — trailing 30 days
+    newUsers30d: Int!
+    newCompanies30d: Int!
+    newEvents30d: Int!
+    newFinalizedEvents30d: Int!
+    # Plans
+    proCount: Int!
+    starterCount: Int!
+    # Activation
+    activatedCompanies: Int!
+    activationRate: Float!
+    # Integrations
+    squareConnectedCount: Int!
+    squareConnectedRate: Float!
+    # Engagement
+    avgEventsPerCompany: Float!
+    avgNetProfitPerEvent: Float
+    # Health signals
+    companiesInactive60d: Int!
+    starterAtLimit: Int!
+    # Trends (last 6 months)
+    companiesByMonth: [MonthCount!]!
+    eventsByMonth: [MonthCount!]!
+    # Geography
+    topZipCodes: [ZipCount!]!
+    eventsByState: [StateCount!]!
+  }
+
   # ─── Queries ─────────────────────────────────────────────────────────────────
   type Query {
     me: Me
@@ -450,6 +511,8 @@ export const typeDefs = `#graphql
     formTemplates(companyId: ID!): [FormTemplate!]!
 
     adminUsers: [AdminUser!]!
+    adminDashboard: AdminDashboard!
+    companiesInState(state: String!): [CompanyLocation!]!
   }
 
   # ─── Mutations ───────────────────────────────────────────────────────────────
@@ -522,8 +585,9 @@ export const typeDefs = `#graphql
     saveFormTemplate(companyId: ID!, input: SaveFormTemplateInput!): FormTemplate!
     activateFormTemplate(companyId: ID!, templateId: ID!): Boolean!
 
-    # Admin
+    # Super Admin
     updateCompanyPlan(companyId: ID!, plan: String!): Company!
+    setSuperAdmin(userId: ID!, isSuperAdmin: Boolean!): Boolean!
 
     # User prefs
     updateUserPrefs(prefs: JSON!): Boolean!

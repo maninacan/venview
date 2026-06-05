@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 import { PosMappingModal } from '../../components/modals/PosMappingModal';
 
 const GET_SETTINGS = gql`
@@ -90,7 +90,7 @@ export function SettingsPage() {
   async function handleConnectSquare() {
     setConnectingSquare(true);
     try {
-      const { supabase } = await import('../../lib/supabase');
+      const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
@@ -109,7 +109,7 @@ export function SettingsPage() {
   async function handleDisconnectSquare() {
     if (!confirm('Disconnect Square? You will need to reconnect to sync sales.')) return;
     try {
-      const { supabase } = await import('../../lib/supabase');
+      const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
@@ -173,19 +173,19 @@ export function SettingsPage() {
 
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Integrations</p>
 
-        <div className="sq-integration-item">
-          <div className="sq-integration-header">
-            <div className="sq-logo">
+        <div className="border border-[rgba(11,42,74,0.12)] rounded-[10px] p-4 mt-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-black rounded-md flex items-center justify-center flex-shrink-0">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <rect width="20" height="20" rx="3" fill="black"/>
                 <rect x="5" y="5" width="10" height="10" rx="2" fill="white"/>
               </svg>
             </div>
-            <div className="sq-integration-meta">
-              <h3>Square POS</h3>
-              <p>Sync sales, locations &amp; labor automatically</p>
+            <div>
+              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">Square POS</h3>
+              <p className="m-0 text-[0.8rem] text-[#64748b]">Sync sales, locations &amp; labor automatically</p>
             </div>
-            <span className={`sq-badge ${squareStatus?.connected ? 'sq-badge-connected' : 'sq-badge-off'}`}>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${squareStatus?.connected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
               {squareStatus?.connected ? `✓ Connected${squareStatus.locationName ? ` — ${squareStatus.locationName}` : ''}` : 'Not Connected'}
             </span>
           </div>
@@ -311,7 +311,7 @@ export function SettingsPage() {
       <div className="card">
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Subscription</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className={`company-card-plan ${info?.plan === 'pro' ? 'plan-pro' : 'plan-starter'}`} style={{ fontSize: '0.88rem', padding: '4px 14px' }}>
+          <span className={`inline-flex items-center text-[0.88rem] font-semibold px-[14px] py-1 rounded-full ${info?.plan === 'pro' ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
             {info?.plan === 'pro' ? '⚡ Venview Pro' : '📋 Venview Starter'}
           </span>
           {info?.plan !== 'pro' && (

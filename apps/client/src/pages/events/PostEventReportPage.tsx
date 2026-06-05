@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_REPORT = gql`
   query GetPostEventReport($id: ID!) {

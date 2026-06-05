@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_EVENTS = gql`
   query GetEventsForRestock($companyId: ID!) {

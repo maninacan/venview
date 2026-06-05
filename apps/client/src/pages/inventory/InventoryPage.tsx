@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_INVENTORY = gql`
   query GetInventory($companyId: ID!) {
@@ -116,7 +116,7 @@ export function InventoryPage() {
       form.append('file', file);
       form.append('companyId', companyId!);
 
-      const { supabase } = await import('../../lib/supabase');
+      const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
@@ -148,14 +148,14 @@ export function InventoryPage() {
   return (
     <>
       <div className="card">
-        <div className="inv-header">
-          <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>📦 My Inventory</h2>
-          <p className="inv-subtitle">Upload your product catalog once — VenView tracks stock and calculates COGS automatically after every Square sync.</p>
+        <div className="mb-4">
+          <h2 className="mt-0 mb-1 text-[#0B2A4A]">📦 My Inventory</h2>
+          <p className="text-[#64748b] text-[0.86rem] m-0">Upload your product catalog once — VenView tracks stock and calculates COGS automatically after every Square sync.</p>
         </div>
 
-        <div className="inv-toolbar">
-          <div className="inv-upload-group">
-            <label className="inv-file-label">
+        <div className="flex flex-wrap gap-2.5 mb-3.5 justify-between items-center">
+          <div className="flex gap-2 items-center flex-wrap">
+            <label className="bg-[#f1f5f9] border border-[#dde3f0] rounded-[7px] px-[13px] py-[7px] text-[0.85rem] cursor-pointer whitespace-nowrap">
               Choose CSV
               <input
                 type="file"
@@ -165,14 +165,14 @@ export function InventoryPage() {
                 onChange={e => setFileName(e.target.files?.[0]?.name ?? 'No file chosen')}
               />
             </label>
-            <span className="inv-file-name">{fileName}</span>
+            <span className="text-[0.82rem] text-[#64748b]">{fileName}</span>
             <button className="btn-primary" onClick={handleUpload} disabled={uploading}>
               {uploading && <span className="spinner" />} ⬆ Upload
             </button>
             <button className="btn-secondary" onClick={downloadTemplate}>⬇ Download Template</button>
             <button className="btn-danger" onClick={handleClearAll}>🗑 Clear All</button>
           </div>
-          <div className="inv-search-group">
+          <div className="flex gap-2 items-center flex-wrap">
             <input type="text" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 180 }} />
             <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ width: 150 }}>
               <option value="">All Categories</option>
@@ -181,10 +181,10 @@ export function InventoryPage() {
           </div>
         </div>
 
-        {loading && <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>Loading…</p>}
+        {loading && <p className="text-[#64748b] text-[0.88rem]">Loading…</p>}
 
         {!loading && filtered.length === 0 && (
-          <p className="inv-empty">
+          <p className="text-[#64748b] text-[0.86rem] py-8 text-center">
             {items.length === 0
               ? 'No inventory items yet — upload a CSV or items will appear here.'
               : 'No items match your search.'}
@@ -192,7 +192,7 @@ export function InventoryPage() {
         )}
 
         {filtered.length > 0 && (
-          <div className="inv-table-wrap">
+          <div className="overflow-x-auto">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>

@@ -17,6 +17,9 @@
     },
     {
       "path": "./apps/marketing"
+    },
+    {
+      "path": "./apps/super-admin-portal"
     }
   ]
 }

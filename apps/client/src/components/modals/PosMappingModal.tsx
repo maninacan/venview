@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
-import { showToast } from '../../hooks/useToast';
+import { showToast } from '@org/data';
 
 const GET_DATA = gql`
   query GetPosMappingData($companyId: ID!) {

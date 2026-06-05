@@ -11,13 +11,11 @@ export function ErrorElement() {
       : 'An unexpected error occurred.';
 
   return (
-    <div className="card" style={{ maxWidth: 560, margin: '40px auto', textAlign: 'center' }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>⚠️</div>
-      <h2 style={{ color: 'var(--vv-navy)', margin: '0 0 8px' }}>Something went wrong</h2>
-      <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '0 0 20px', lineHeight: 1.5 }}>
-        {message}
-      </p>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+    <div className="card max-w-[560px] mx-auto mt-10 text-center">
+      <div className="text-[2.5rem] mb-3">⚠️</div>
+      <h2 className="text-[#0B2A4A] mt-0 mb-2">Something went wrong</h2>
+      <p className="text-[#64748b] text-[0.9rem] mt-0 mb-5 leading-relaxed">{message}</p>
+      <div className="flex gap-2.5 justify-center">
         <button className="btn-primary" onClick={() => window.location.reload()}>Try Again</button>
         <button className="btn-secondary" onClick={() => navigate(-1)}>← Go Back</button>
       </div>
