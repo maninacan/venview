@@ -4,6 +4,8 @@ export function ErrorElement() {
   const error = useRouteError();
   const navigate = useNavigate();
 
+  console.error('[RouteError]', error);
+
   const message = isRouteErrorResponse(error)
     ? `${error.status} — ${error.statusText}`
     : error instanceof Error
