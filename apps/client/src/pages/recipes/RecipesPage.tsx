@@ -124,8 +124,8 @@ export function RecipesPage() {
               <div className="text-[0.97rem] font-bold text-[#0B2A4A] mb-1">{recipe.name}</div>
               <div className="text-[0.82rem] text-[#64748b]">${Number(recipe.totalCost).toFixed(4)}/batch · {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? 's' : ''}</div>
               <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => openEdit(recipe)}>✏️ Edit</button>
-                <button className="btn-danger-subtle" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => handleDelete(recipe.id, recipe.name)}>🗑</button>
+                <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => openEdit(recipe)}><i className="fa-solid fa-pen-to-square" /> Edit</button>
+                <button className="btn-danger-subtle" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => handleDelete(recipe.id, recipe.name)}><i className="fa-solid fa-trash" /></button>
               </div>
               {recipe.ingredients.length > 0 && (
                 <details style={{ marginTop: 8 }}>
@@ -159,7 +159,7 @@ export function RecipesPage() {
       {(isNew || editing) && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeForm(); }}>
           <div className="modal-box" style={{ maxWidth: 600 }}>
-            <button className="modal-close" onClick={closeForm}>✕</button>
+            <button className="modal-close" onClick={closeForm}><i className="fa-solid fa-xmark" /></button>
             <h3 style={{ margin: '0 0 16px' }}>{isNew ? 'New Recipe' : `Edit: ${editing?.name}`}</h3>
 
             <div className="form-group">
@@ -185,7 +185,7 @@ export function RecipesPage() {
                 <input type="number" step="0.001" value={ing.quantity} onChange={e => updateIngredient(i, 'quantity', e.target.value)} style={{ textAlign: 'right' }} />
                 <input type="number" step="0.0001" value={ing.unitCost} onChange={e => updateIngredient(i, 'unitCost', e.target.value)} style={{ textAlign: 'right' }} />
                 <input type="text" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} placeholder="oz, g…" />
-                <button onClick={() => removeIngredient(i)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem', padding: 0 }}>✕</button>
+                <button onClick={() => removeIngredient(i)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem', padding: 0 }}><i className="fa-solid fa-xmark" /></button>
               </div>
             ))}
 

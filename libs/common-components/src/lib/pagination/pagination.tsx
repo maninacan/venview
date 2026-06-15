@@ -1,4 +1,3 @@
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -74,7 +73,7 @@ const Pagination = ({
             className="relative inline-flex items-center rounded-l-md px-1.5 py-1.5 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"
           >
             <span className="sr-only">Previous</span>
-            <ChevronLeftIcon aria-hidden="true" className="size-4" />
+            <i aria-hidden="true" className="fa-solid fa-chevron-left text-sm" />
           </button>
 
           {pages.map((page, idx) =>
@@ -108,7 +107,7 @@ const Pagination = ({
             className="relative inline-flex items-center rounded-r-md px-1.5 py-1.5 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"
           >
             <span className="sr-only">Next</span>
-            <ChevronRightIcon aria-hidden="true" className="size-4" />
+            <i aria-hidden="true" className="fa-solid fa-chevron-right text-sm" />
           </button>
         </nav>
       </div>

@@ -147,11 +147,11 @@ export function EventDashboardPage() {
         <div className="flex flex-col gap-[7px] mb-[18px] mt-3.5">
           <div className="flex flex-wrap gap-2 items-center">
             <SyncSquareSalesButton eventId={eventId!} squareLocationId={event?.squareLocationId} onSynced={refetch} />
-            <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary">✏️ Edit Event</Link>
-            <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary">📊 Post-Event Report</Link>
+            <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary"><i className="fa-solid fa-pen-to-square" /> Edit Event</Link>
+            <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary"><i className="fa-solid fa-chart-bar" /> Post-Event Report</Link>
           </div>
           <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-[#f1f5f9] mt-0.5">
-            <button className="btn-danger-subtle" onClick={handleDelete}>🗑 Delete Event</button>
+            <button className="btn-danger-subtle" onClick={handleDelete}><i className="fa-solid fa-trash" /> Delete Event</button>
           </div>
         </div>
       </div>
@@ -277,7 +277,7 @@ function SyncSquareSalesButton({ eventId, squareLocationId, onSynced }: { eventI
   return (
     <button className="btn-primary" onClick={handleSync} disabled={syncing}>
       {syncing && <span className="spinner" />}
-      🔄 Pull Square Sales
+      <i className="fa-solid fa-arrows-rotate" /> Pull Square Sales
     </button>
   );
 }
@@ -319,7 +319,7 @@ function ManualSalesForm({ eventId, sales, onSaved }: { eventId: string; sales: 
       ))}
       <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
         <button className="btn-primary" onClick={save} disabled={saving} style={{ fontSize: '0.86rem' }}>
-          {saving && <span className="spinner" />} 💾 Save Sales Data
+          {saving && <span className="spinner" />} <i className="fa-solid fa-floppy-disk" /> Save Sales Data
         </button>
       </div>
     </div>
@@ -417,7 +417,7 @@ function LaborSection({ eventId, companyId, laborEntries, onSaved }: { eventId: 
                 <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">{Number(r['hours']).toFixed(2)}</td>
                 <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">${Number(r['wage']).toFixed(2)}/hr</td>
                 <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle font-semibold">${Number(r['total']).toFixed(2)}</td>
-                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle"><button onClick={() => removeShift(r['id'] as string)} className="bg-transparent border-0 text-[#dc2626] cursor-pointer text-[0.85rem]">✕</button></td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle"><button onClick={() => removeShift(r['id'] as string)} className="bg-transparent border-0 text-[#dc2626] cursor-pointer text-[0.85rem]"><i className="fa-solid fa-xmark" /></button></td>
               </tr>
             ))}
           </tbody>
@@ -486,7 +486,7 @@ function AdditionalFeesSection({ eventId, fees, onSaved }: { eventId: string; fe
           <span>{f['label'] as string}{f['isDiscount'] ? ' (discount)' : ''}</span>
           <span style={{ display: 'flex', gap: 8 }}>
             <span>{f['isDiscount'] ? '-' : ''}${Number(f['amount']).toFixed(2)}</span>
-            <button onClick={() => { deleteFee({ variables: { id: f['id'] } }); onSaved(); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>✕</button>
+            <button onClick={() => { deleteFee({ variables: { id: f['id'] } }); onSaved(); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><i className="fa-solid fa-xmark" /></button>
           </span>
         </div>
       ))}
@@ -557,7 +557,7 @@ function ExpensesForm({ eventId, expenses, onSaved }: { eventId: string; expense
         ))}
       </div>
       <button className="btn-primary" onClick={save} disabled={saving} style={{ marginTop: 12, fontSize: '0.86rem' }}>
-        {saving && <span className="spinner" />} 💾 Save Expenses
+        {saving && <span className="spinner" />} <i className="fa-solid fa-floppy-disk" /> Save Expenses
       </button>
     </div>
   );

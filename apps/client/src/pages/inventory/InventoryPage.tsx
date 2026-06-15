@@ -170,7 +170,7 @@ export function InventoryPage() {
               {uploading && <span className="spinner" />} ⬆ Upload
             </button>
             <button className="btn-secondary" onClick={downloadTemplate}>⬇ Download Template</button>
-            <button className="btn-danger" onClick={handleClearAll}>🗑 Clear All</button>
+            <button className="btn-danger" onClick={handleClearAll}><i className="fa-solid fa-trash" /> Clear All</button>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
             <input type="text" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 180 }} />
@@ -243,8 +243,8 @@ export function InventoryPage() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => startEdit(item)}>✏️</button>
-                            <button className="btn-danger-subtle" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => handleDelete(item.id)}>🗑</button>
+                            <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => startEdit(item)}><i className="fa-solid fa-pen-to-square" /></button>
+                            <button className="btn-danger-subtle" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => handleDelete(item.id)}><i className="fa-solid fa-trash" /></button>
                           </div>
                         )}
                       </td>

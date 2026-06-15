@@ -92,7 +92,7 @@ export function CompaniesPage() {
       <div className="flex gap-3 mt-7 flex-wrap">
         {!showJoinForm ? (
           <button className="btn-secondary" onClick={() => setShowJoinForm(true)}>
-            🔗 Join a company
+            <i className="fa-solid fa-link" /> Join a company
           </button>
         ) : (
           <form onSubmit={handleJoin} className="flex gap-2 items-center flex-wrap">

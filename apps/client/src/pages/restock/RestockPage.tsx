@@ -68,7 +68,7 @@ export function RestockPage() {
     <>
       <div className="card">
         <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>🔄 Restock List</h2>
+          <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}><i className="fa-solid fa-arrows-rotate" /> Restock List</h2>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.86rem' }}>
             Pick an event, then mark items restocked after refilling. Restocking adds quantity back to your warehouse stock.
           </p>

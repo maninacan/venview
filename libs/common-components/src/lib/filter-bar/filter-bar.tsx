@@ -19,8 +19,6 @@ import {
   Transition,
   TransitionChild,
 } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import classNames from 'classnames';
 import {
   ActiveTableFilterOption,
@@ -164,7 +162,7 @@ export const FilterBar = ({
                     onClick={() => setOpen(false)}
                   >
                     <span className="sr-only">Close menu</span>
-                    <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+                    <i aria-hidden="true" className="fa-solid fa-xmark text-lg" />
                   </button>
                 </div>
 
@@ -177,10 +175,10 @@ export const FilterBar = ({
                             <DisclosureButton className="flex w-full items-center justify-between bg-white px-2 py-3 text-sm text-gray-400">
                               <span className="font-medium text-gray-900">{section.value}</span>
                               <span className="ml-6 flex items-center">
-                                <ChevronDownIcon
-                                  className={classNames(sectionOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform')}
+                                <span
+                                  className={classNames(sectionOpen ? '-rotate-180' : 'rotate-0', 'transform inline-block text-sm')}
                                   aria-hidden="true"
-                                />
+                                ><i className="fa-solid fa-chevron-down" /></span>
                               </span>
                             </DisclosureButton>
                           </h3>
@@ -244,7 +242,7 @@ export const FilterBar = ({
                 <Menu as="div" className="relative inline-block text-left">
                   <MenuButton className="group inline-flex justify-center text-xs font-medium text-gray-700 hover:text-gray-900">
                     {`Sort by ${activeSort?.value}`}
-                    <ChevronDownIcon className="-mr-1 ml-1 h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-gray-500" aria-hidden="true" />
+                    <i aria-hidden="true" className="-mr-1 ml-1 flex-shrink-0 text-gray-400 group-hover:text-gray-500 fa-solid fa-chevron-down text-xs" />
                   </MenuButton>
                   <Transition
                     as={Fragment}

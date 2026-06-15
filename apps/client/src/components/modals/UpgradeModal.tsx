@@ -4,15 +4,15 @@ interface Props {
 }
 
 const CONTEXTS: Record<string, { icon: string; text: string }> = {
-  report: { icon: '📊', text: 'Post-Event Reports are a Pro feature.' },
-  finalize: { icon: '✅', text: 'Starter includes 1 finalized event. Upgrade to track more.' },
-  history: { icon: '📋', text: 'Viewing finalized event history requires Pro.' },
-  pdf: { icon: '📄', text: 'PDF export is a Pro feature.' },
-  multiday: { icon: '📅', text: 'Starter supports up to 2-day events. Upgrade to Pro for longer festivals.' },
+  report: { icon: 'fa-solid fa-chart-bar', text: 'Post-Event Reports are a Pro feature.' },
+  finalize: { icon: 'fa-solid fa-circle-check', text: 'Starter includes 1 finalized event. Upgrade to track more.' },
+  history: { icon: 'fa-solid fa-clipboard-list', text: 'Viewing finalized event history requires Pro.' },
+  pdf: { icon: 'fa-solid fa-file-pdf', text: 'PDF export is a Pro feature.' },
+  multiday: { icon: 'fa-solid fa-calendar-days', text: 'Starter supports up to 2-day events. Upgrade to Pro for longer festivals.' },
 };
 
 export function UpgradeModal({ context, onClose }: Props) {
-  const ctx = CONTEXTS[context] ?? { icon: '🔒', text: context };
+  const ctx = CONTEXTS[context] ?? { icon: 'fa-solid fa-lock', text: context };
 
   const featureCheck = 'w-[19px] h-[19px] rounded-full flex items-center justify-center text-[0.7rem] font-bold flex-shrink-0 mt-0.5';
 
@@ -24,15 +24,15 @@ export function UpgradeModal({ context, onClose }: Props) {
           <button
             className="absolute top-3.5 right-3.5 bg-transparent border-0 text-[1.1rem] cursor-pointer text-[rgba(255,255,255,0.7)] px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.1)]"
             onClick={onClose}
-          >✕</button>
-          <div className="inline-block bg-[#FFD84D] text-[#0B2A4A] text-[0.76rem] font-bold px-[11px] py-[3px] rounded-full">⚡ Venview Pro</div>
+          ><i className="fa-solid fa-xmark" /></button>
+          <div className="inline-block bg-[#FFD84D] text-[#0B2A4A] text-[0.76rem] font-bold px-[11px] py-[3px] rounded-full"><i className="fa-solid fa-bolt" /> Venview Pro</div>
           <h2 className="text-white mt-2 mb-1 text-[1.35rem]">Unlock the complete picture.</h2>
           <p className="text-[rgba(255,255,255,0.78)] text-[0.86rem] m-0">See every event's true profit, track trends over time, and make smarter decisions — faster.</p>
         </div>
 
         {/* Trigger reason */}
         <div className="flex items-center gap-2 bg-[#fffbeb] border-t border-b border-[#fde68a] px-5 py-2.5 text-[0.84rem] text-[#92400e]">
-          <span>{ctx.icon}</span>
+          <i className={ctx.icon} />
           <span>{ctx.text}</span>
         </div>
 
@@ -66,7 +66,7 @@ export function UpgradeModal({ context, onClose }: Props) {
             </li>
           </ul>
           <div className="flex items-center gap-2 bg-[#f8fafc] rounded-lg px-3 py-[9px] text-[0.8rem] text-[#64748b]">
-            <span>📋</span>
+            <i className="fa-solid fa-clipboard-list" />
             <span>You're on <strong>Venview Starter</strong> — includes 1 finalized event and basic profit summary.</span>
           </div>
         </div>
@@ -78,7 +78,7 @@ export function UpgradeModal({ context, onClose }: Props) {
             style={{ transition: 'background 0.15s' }}
             onClick={onClose}
           >
-            ⚡ Upgrade to Pro
+            <i className="fa-solid fa-bolt" /> Upgrade to Pro
           </button>
           <p className="text-[0.76rem] text-[#64748b] mt-[5px] mb-3.5">Contact us to upgrade &nbsp;·&nbsp; No spreadsheets, no guesswork</p>
           <button

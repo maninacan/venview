@@ -1,4 +1,3 @@
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import {
   ActiveTableFilterOption,
@@ -57,10 +56,7 @@ export const FilterPopover = ({
             {numSelected}
           </span>
         ) : null}
-        <ChevronDownIcon
-          className="-mr-1 ml-1 h-5 w-5 flex-shrink-0 text-gray-400 group-hover:text-gray-500"
-          aria-hidden="true"
-        />
+        <i aria-hidden="true" className="-mr-1 ml-1 text-gray-400 group-hover:text-gray-500 fa-solid fa-chevron-down text-sm" />
       </button>
 
       {open && (

@@ -312,7 +312,7 @@ export function SettingsPage() {
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Subscription</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className={`inline-flex items-center text-[0.88rem] font-semibold px-[14px] py-1 rounded-full ${info?.plan === 'pro' ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
-            {info?.plan === 'pro' ? '⚡ Venview Pro' : '📋 Venview Starter'}
+            {info?.plan === 'pro' ? <><i className="fa-solid fa-bolt" /> Venview Pro</> : <><i className="fa-solid fa-clipboard-list" /> Venview Starter</>}
           </span>
           {info?.plan !== 'pro' && (
             <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
