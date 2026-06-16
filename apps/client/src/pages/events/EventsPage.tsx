@@ -166,9 +166,9 @@ export function EventsPage() {
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             style={{ maxWidth: 220 }}
           />
-          <button className="btn-secondary" onClick={handleSearch}>🔍 Search</button>
-          <button className="btn-secondary" onClick={clearSearch}>🧹 Clear</button>
-          <button className="btn-secondary" onClick={exportCSV}>📥 Export CSV</button>
+          <button className="btn-secondary" onClick={handleSearch}><i className="fa-solid fa-magnifying-glass" /> Search</button>
+          <button className="btn-secondary" onClick={clearSearch}><i className="fa-solid fa-broom" /> Clear</button>
+          <button className="btn-secondary" onClick={exportCSV}><i className="fa-solid fa-file-arrow-down" /> Export CSV</button>
           <Link to={`/companies/${companyId}/events/new`} className="btn-primary ml-auto">
             + Add Event
           </Link>

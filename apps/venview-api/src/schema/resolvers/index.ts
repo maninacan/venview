@@ -33,4 +33,5 @@ export const resolvers = {
     ...inventoryResolvers.Mutation,
   },
   Company: companyResolvers.Company,
+  Permit: eventResolvers.Permit,
 };

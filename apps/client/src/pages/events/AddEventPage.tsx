@@ -315,7 +315,7 @@ export function AddEventPage() {
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading && <span className="spinner" />}
-            {isEdit ? 'Save Changes' : 'Create Event'}
+            <span>{isEdit ? 'Save Changes' : 'Create Event'}</span>
           </button>
           <button
             type="button"

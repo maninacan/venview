@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@org/data';
+import venviewLogo from '../../assets/venview-icon-lg.png';
 
 type AuthMode = 'signin' | 'signup';
 
@@ -93,16 +94,26 @@ export function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F6FBFF] p-6">
+    <div className="min-h-screen flex flex-col bg-[#f3f5fa]">
+      {/* Header — matches the main app header */}
+      <header className="bg-white px-5 h-[70px] flex items-center justify-between border-b border-[#dde3f0] shadow-[0_2px_6px_rgba(0,0,0,0.08)]">
+        <Link to="/auth" className="flex items-center gap-2.5 no-underline">
+          <img src={venviewLogo} alt="VenView" className="h-[50px] w-auto" />
+          <div>
+            <span className="block text-[1.05rem] font-bold leading-tight" style={{ color: '#2E7D32' }}>
+              VenView Events
+            </span>
+            <span className="block text-[0.68rem] text-[#666]">Vendor Intelligence for Events</span>
+          </div>
+        </Link>
+        <Link to="/auth" className="text-[0.87rem] text-[#222] no-underline hover:text-[#0B2A4A]">Home</Link>
+      </header>
+
+      <div className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-[420px]">
         <div className="bg-white rounded-[20px] p-10 shadow-[0_12px_30px_rgba(11,42,74,0.12)] border border-[rgba(11,42,74,0.12)]">
           <div className="text-center mb-7">
-            <span
-              className="block text-[1.7rem] text-[#0B2A4A] font-normal"
-              style={{ fontFamily: "'DM Serif Display', serif" }}
-            >
-              Venview Events
-            </span>
+            <span className="block text-[1.4rem] font-semibold" style={{ color: '#2E7D32' }}>Venview Events</span>
             <span className="block text-[0.8rem] text-[#64748b] mt-0.5">Vendor Intelligence for Events</span>
           </div>
 
@@ -137,7 +148,7 @@ export function AuthPage() {
             <div className="text-[#dc2626] text-[0.85rem] min-h-5 mb-2">{error}</div>
             <button type="submit" className="btn-primary w-full justify-center py-[11px] text-base" disabled={loading}>
               {loading && <span className="spinner" />}
-              {mode === 'signin' ? 'Sign In' : 'Sign Up'}
+              <span>{mode === 'signin' ? 'Sign In' : 'Sign Up'}</span>
             </button>
           </form>
 
@@ -165,12 +176,13 @@ export function AuthPage() {
           )}
         </div>
       </div>
+      </div>
 
       {/* Forgot Password Modal */}
       {showForgot && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForgot(false); }}>
           <div className="modal-box" style={{ maxWidth: 400 }}>
-            <button className="modal-close" onClick={() => setShowForgot(false)}>✕</button>
+            <button className="modal-close" onClick={() => setShowForgot(false)}><i className="fa-solid fa-xmark" /></button>
             <h3 style={{ margin: '0 0 8px' }}>Reset Password</h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--muted)', margin: '0 0 16px' }}>
               Enter your email and we'll send a reset link.

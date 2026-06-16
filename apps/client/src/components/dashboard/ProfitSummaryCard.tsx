@@ -183,7 +183,7 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
               disabled={loading}
             >
               {loading && <span className="spinner" />}
-              ✅ Finalize Event
+              <span>✅ Finalize Event</span>
             </button>
           )}
         </div>

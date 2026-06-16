@@ -10,7 +10,11 @@ import { createContext } from './context/index.js';
 import healthRouter from './routes/health.js';
 import squareRouter from './routes/square.js';
 import uploadsRouter from './routes/uploads.js';
+<<<<<<< HEAD
 import logger from './lib/logger.js';
+=======
+import billingRouter from './routes/billing.js';
+>>>>>>> 6ffbca083806b691ee370dc019cb2db527ffd699
 
 const host = process.env['HOST'] ?? 'localhost';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 3000;
@@ -38,6 +42,10 @@ async function main() {
     })
   );
 
+  // Stripe webhook needs the raw, unparsed body for signature verification —
+  // register it before the global JSON parser.
+  app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+
   app.use(express.json());
 
   // HTTP request logging
@@ -59,6 +67,7 @@ async function main() {
   app.use('/api', healthRouter);
   app.use('/api', squareRouter);
   app.use('/api', uploadsRouter);
+  app.use('/api', billingRouter);
 
   // GraphQL endpoint
   app.use(

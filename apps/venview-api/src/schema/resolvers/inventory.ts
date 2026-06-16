@@ -114,6 +114,37 @@ export const inventoryResolvers = {
   },
 
   Mutation: {
+    createInventoryItem: async (
+      _: unknown,
+      { companyId, input }: { companyId: string; input: Record<string, unknown> },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      // Map 'name' → 'itemName' for the DB column
+      const dbInput: Record<string, unknown> = { ...input, companyId, updatedAt: new Date().toISOString() };
+      if ('name' in dbInput) { dbInput['itemName'] = dbInput['name']; delete dbInput['name']; }
+
+      // Upsert by itemName within company so re-imports update rather than duplicate
+      const { data, error } = await supabase
+        .from('VendorInventory')
+        .upsert(dbInput, { onConflict: 'companyId,itemName' })
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+
+      const row = data as Record<string, unknown>;
+      const qty = Number(row['quantityOnHand'] ?? 0);
+      const threshold = Number(row['reorderThreshold'] ?? 0);
+      if (threshold > 0 && qty <= threshold) {
+        await checkAndCreateAlerts(companyId);
+      }
+
+      return { ...row, id: row['id'], name: row['itemName'] };
+    },
+
     updateInventoryItem: async (
       _: unknown,
       { id, input }: { id: string; input: Record<string, unknown> },

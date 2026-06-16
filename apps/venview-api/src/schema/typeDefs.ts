@@ -21,6 +21,8 @@ export const typeDefs = `#graphql
     ownerId: ID!
     joinCode: String
     plan: String!
+    subscriptionStatus: String
+    currentPeriodEnd: String
     createdAt: String
     members: [CompanyMember!]!
     squareStatus: SquareStatus
@@ -139,7 +141,8 @@ export const typeDefs = `#graphql
   type Permit {
     id: ID!
     fileName: String!
-    fileUrl: String!
+    "Short-lived signed URL minted on read (files are stored privately)."
+    fileUrl: String
     uploadedAt: String
   }
 
@@ -360,6 +363,15 @@ export const typeDefs = `#graphql
     sku: String
   }
 
+  input CreateInventoryItemInput {
+    name: String!
+    category: String
+    unitCost: Float
+    quantityOnHand: Float
+    reorderThreshold: Float
+    sku: String
+  }
+
   input PosMappingInput {
     posSystem: String!
     posItemId: String!
@@ -568,6 +580,7 @@ export const typeDefs = `#graphql
     deleteRecipe(id: ID!): Boolean!
 
     # Inventory
+    createInventoryItem(companyId: ID!, input: CreateInventoryItemInput!): InventoryItem!
     updateInventoryItem(id: ID!, input: UpdateInventoryItemInput!): InventoryItem!
     deleteInventoryItem(id: ID!): Boolean!
     clearInventory(companyId: ID!): Boolean!

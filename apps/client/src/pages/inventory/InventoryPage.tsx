@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
@@ -22,6 +22,11 @@ const DELETE_ITEM = gql`
 const CLEAR_ALL = gql`
   mutation ClearInventory($companyId: ID!) { clearInventory(companyId: $companyId) }
 `;
+const CREATE_ITEM = gql`
+  mutation CreateInventoryItem($companyId: ID!, $input: CreateInventoryItemInput!) {
+    createInventoryItem(companyId: $companyId, input: $input) { id name }
+  }
+`;
 
 interface InventoryItem {
   id: string;
@@ -33,23 +38,59 @@ interface InventoryItem {
   sku?: string | null;
 }
 
+interface ImportedItem {
+  tempId: string;
+  name: string;
+  category: string;
+  unitCost: number;
+  quantityOnHand: number;
+  reorderThreshold: number;
+  sku: string;
+}
+
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
 
 export function InventoryPage() {
   const { companyId } = useCurrentCompany();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+  const streamOutputRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data, loading, refetch } = useQuery(GET_INVENTORY, { variables: { companyId }, skip: !companyId });
   const [updateItem] = useMutation(UPDATE_ITEM);
   const [deleteItem] = useMutation(DELETE_ITEM);
   const [clearAll] = useMutation(CLEAR_ALL);
+  const [createItem] = useMutation(CREATE_ITEM);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVals, setEditVals] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [fileName, setFileName] = useState('No file chosen');
+
+  // AI import state
+  const [aiUploading, setAiUploading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [streamingElapsed, setStreamingElapsed] = useState(0);
+  const [streamingError, setStreamingError] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedItems, setImportedItems] = useState<ImportedItem[]>([]);
+  const [approvingAll, setApprovingAll] = useState(false);
+
+  useEffect(() => {
+    if (streamOutputRef.current) streamOutputRef.current.scrollTop = streamOutputRef.current.scrollHeight;
+  }, [streamingText]);
+
+  useEffect(() => {
+    if (isStreaming) {
+      setStreamingElapsed(0);
+      timerRef.current = setInterval(() => setStreamingElapsed(s => s + 1), 1000);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isStreaming]);
 
   const items: InventoryItem[] = data?.inventory ?? [];
   const categories = [...new Set(items.map(i => i.category).filter(Boolean) as string[])].sort();
@@ -107,70 +148,147 @@ export function InventoryPage() {
     refetch();
   }
 
-  async function handleUpload() {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) { showToast('Select a CSV file first', 'error'); return; }
-    setUploading(true);
+  async function handleAIUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAiUploading(true);
+    setIsStreaming(true);
+    setStreamingText('');
+    setStreamingError(null);
+    let parseError = false;
     try {
       const form = new FormData();
       form.append('file', file);
       form.append('companyId', companyId!);
-
       const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-
-      const res = await fetch(`${API_URL}/api/uploads/inventory-csv`, {
+      const res = await fetch(`${API_URL}/api/uploads/inventory-ai`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: form,
       });
-      const result = await res.json() as { success?: boolean; imported?: number; error?: string };
-      if (!res.ok || !result.success) throw new Error(result.error ?? 'Upload failed');
-      showToast(`✅ Imported ${result.imported} items!`, 'success', 5000);
-      refetch();
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setFileName('No file chosen');
+
+      if (!res.ok) {
+        const error = await res.json() as { error: string };
+        throw new Error(error.error ?? 'Upload failed');
+      }
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        setStreamingText(fullText);
+      }
+
+      const stripped = fullText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+      const jsonStart = stripped.indexOf('{');
+      const jsonEnd = stripped.lastIndexOf('}');
+      const jsonText = jsonStart >= 0 && jsonEnd > jsonStart ? stripped.slice(jsonStart, jsonEnd + 1) : stripped;
+
+      let parsed: { items?: Array<Partial<ImportedItem>> };
+      try {
+        parsed = JSON.parse(jsonText) as typeof parsed;
+      } catch (parseErr) {
+        parseError = true;
+        const reason = parseErr instanceof SyntaxError ? parseErr.message : String(parseErr);
+        setStreamingError(`JSON parse failed: ${reason}\n\nThe output above is what Claude returned. It may be truncated or contain unexpected text.`);
+        return;
+      }
+
+      if (!parsed.items?.length) {
+        showToast('No items found in that file. Try a different file.', 'warning');
+        return;
+      }
+      setImportedItems(parsed.items.map(it => ({
+        tempId: crypto.randomUUID(),
+        name: it.name ?? '',
+        category: it.category ?? '',
+        unitCost: Number(it.unitCost) || 0,
+        quantityOnHand: Number(it.quantityOnHand) || 0,
+        reorderThreshold: Number(it.reorderThreshold) || 0,
+        sku: it.sku ?? '',
+      })));
+      setShowImportModal(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Upload failed', 'error');
-    } finally { setUploading(false); }
+      showToast(err instanceof Error ? err.message : 'Import failed', 'error');
+    } finally {
+      setAiUploading(false);
+      if (!parseError) setIsStreaming(false);
+      if (aiFileInputRef.current) aiFileInputRef.current.value = '';
+    }
   }
 
-  function downloadTemplate() {
-    const csv = 'itemName,category,unitCost,quantityOnHand,reorderThreshold,sku\nLemon Syrup,Syrups,3.50,10,2,SYR-001\n';
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'inventory_template.csv'; a.click();
-    URL.revokeObjectURL(url);
+  function closeImportModal() {
+    setShowImportModal(false);
+    setImportedItems([]);
+  }
+
+  function updateImportedItem(tempId: string, field: keyof ImportedItem, value: string) {
+    const numeric = field === 'unitCost' || field === 'quantityOnHand' || field === 'reorderThreshold';
+    setImportedItems(prev => prev.map(it =>
+      it.tempId === tempId ? { ...it, [field]: numeric ? (parseFloat(value) || 0) : value } : it
+    ));
+  }
+
+  function deleteImportedItem(tempId: string) {
+    setImportedItems(prev => prev.filter(it => it.tempId !== tempId));
+  }
+
+  async function handleApproveAll() {
+    setApprovingAll(true);
+    let saved = 0;
+    try {
+      for (const it of importedItems) {
+        if (!it.name.trim()) continue;
+        await createItem({
+          variables: {
+            companyId,
+            input: {
+              name: it.name.trim(),
+              category: it.category.trim() || null,
+              unitCost: it.unitCost,
+              quantityOnHand: it.quantityOnHand,
+              reorderThreshold: it.reorderThreshold,
+              sku: it.sku.trim() || null,
+            },
+          },
+        });
+        saved++;
+      }
+      showToast(`Saved ${saved} item${saved !== 1 ? 's' : ''}!`, 'success', 5000);
+      refetch();
+      closeImportModal();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save items', 'error');
+    } finally { setApprovingAll(false); }
   }
 
   return (
     <>
       <div className="card">
         <div className="mb-4">
-          <h2 className="mt-0 mb-1 text-[#0B2A4A]">📦 My Inventory</h2>
+          <h2 className="mt-0 mb-1 text-[#0B2A4A]">📦 My Inventory{!loading && items.length > 0 && <span className="text-[#64748b] font-normal"> ({items.length})</span>}</h2>
           <p className="text-[#64748b] text-[0.86rem] m-0">Upload your product catalog once — VenView tracks stock and calculates COGS automatically after every Square sync.</p>
         </div>
 
         <div className="flex flex-wrap gap-2.5 mb-3.5 justify-between items-center">
           <div className="flex gap-2 items-center flex-wrap">
-            <label className="bg-[#f1f5f9] border border-[#dde3f0] rounded-[7px] px-[13px] py-[7px] text-[0.85rem] cursor-pointer whitespace-nowrap">
-              Choose CSV
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".csv"
-                style={{ display: 'none' }}
-                onChange={e => setFileName(e.target.files?.[0]?.name ?? 'No file chosen')}
-              />
-            </label>
-            <span className="text-[0.82rem] text-[#64748b]">{fileName}</span>
-            <button className="btn-primary" onClick={handleUpload} disabled={uploading}>
-              {uploading && <span className="spinner" />} ⬆ Upload
+            <button className="btn-primary" onClick={() => aiFileInputRef.current?.click()} disabled={aiUploading}>
+              <i className={aiUploading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'} />
+              <span>{aiUploading ? ' Analyzing…' : ' AI Import'}</span>
             </button>
-            <button className="btn-secondary" onClick={downloadTemplate}>⬇ Download Template</button>
-            <button className="btn-danger" onClick={handleClearAll}>🗑 Clear All</button>
+            <input
+              type="file"
+              ref={aiFileInputRef}
+              style={{ display: 'none' }}
+              accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,.gif,.heic"
+              onChange={handleAIUpload}
+            />
+            <button className="btn-danger" onClick={handleClearAll}><i className="fa-solid fa-trash" /> Clear All</button>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
             <input type="text" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 180 }} />
@@ -243,8 +361,8 @@ export function InventoryPage() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => startEdit(item)}>✏️</button>
-                            <button className="btn-danger-subtle" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => handleDelete(item.id)}>🗑</button>
+                            <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => startEdit(item)}><i className="fa-solid fa-pen-to-square" /></button>
+                            <button className="btn-danger-subtle" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => handleDelete(item.id)}><i className="fa-solid fa-trash" /></button>
                           </div>
                         )}
                       </td>
@@ -257,6 +375,92 @@ export function InventoryPage() {
           </div>
         )}
       </div>
+
+      {/* Streaming output window */}
+      {isStreaming && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', height: 'min(85vh, 640px)', padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '24px 28px 12px', flexShrink: 0 }}>
+              <h3 style={{ margin: '0 0 4px', color: streamingError ? 'var(--danger)' : 'var(--vv-navy)' }}>
+                <i className={`fa-solid ${streamingError ? 'fa-triangle-exclamation' : 'fa-spinner fa-spin'}`} style={{ marginRight: 8 }} />
+                <span>{streamingError ? 'Parse Error — Raw Output' : 'Claude is analyzing your file…'}</span>
+              </h3>
+              <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>{streamingError ?? 'This may take 20–40 seconds for large files.'}</span>
+                {!streamingError && (
+                  <span style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontSize: '0.88rem', color: 'var(--vv-navy)', fontWeight: 600 }}>
+                    {`${Math.floor(streamingElapsed / 60)}:${String(streamingElapsed % 60).padStart(2, '0')}`}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div
+              ref={streamOutputRef}
+              style={{ flex: 1, overflowY: 'auto', background: '#0f172a', margin: '0 28px', borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: '0.75rem', color: streamingError ? '#fca5a5' : '#86efac', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+            >
+              {streamingText}
+            </div>
+            <div style={{ padding: '12px 28px 24px', flexShrink: 0 }}>
+              {streamingError && (
+                <button className="btn-secondary" onClick={() => { setIsStreaming(false); setStreamingError(null); }}>
+                  <span>Close</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Import Review Modal */}
+      {showImportModal && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeImportModal(); }}>
+          <div className="modal-box" style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', height: 'min(90vh, 820px)', padding: 0, overflow: 'hidden' }}>
+            <button className="modal-close" onClick={closeImportModal}><i className="fa-solid fa-xmark" /></button>
+            <div style={{ padding: '28px 28px 12px', flexShrink: 0 }}>
+              <h3 style={{ margin: '0 0 4px' }}>
+                <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--vv-navy)', marginRight: 8 }} />
+                <span>Review AI-Parsed Inventory</span>
+              </h3>
+              <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
+                {importedItems.length} item{importedItems.length !== 1 ? 's' : ''} detected. Edit or delete any before saving. Existing items with the same name will be updated.
+              </p>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0 28px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 90px 80px 80px 1fr 28px', gap: '6px 8px', fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600, position: 'sticky', top: 0, background: '#fff', padding: '6px 0' }}>
+                <span>Name</span>
+                <span>Category</span>
+                <span style={{ textAlign: 'right' }}>Unit Cost</span>
+                <span style={{ textAlign: 'right' }}>On Hand</span>
+                <span style={{ textAlign: 'right' }}>Reorder</span>
+                <span>SKU</span>
+                <span />
+              </div>
+              {importedItems.map(it => (
+                <div key={it.tempId} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 90px 80px 80px 1fr 28px', gap: '4px 8px', marginBottom: 4, alignItems: 'center' }}>
+                  <input type="text" value={it.name} onChange={e => updateImportedItem(it.tempId, 'name', e.target.value)} placeholder="Item name" style={{ fontSize: '0.83rem' }} />
+                  <input type="text" value={it.category} onChange={e => updateImportedItem(it.tempId, 'category', e.target.value)} placeholder="Category" style={{ fontSize: '0.83rem' }} />
+                  <input type="number" step="0.0001" value={it.unitCost} onChange={e => updateImportedItem(it.tempId, 'unitCost', e.target.value)} style={{ fontSize: '0.83rem', textAlign: 'right' }} />
+                  <input type="number" step="0.01" value={it.quantityOnHand} onChange={e => updateImportedItem(it.tempId, 'quantityOnHand', e.target.value)} style={{ fontSize: '0.83rem', textAlign: 'right' }} />
+                  <input type="number" step="0.01" value={it.reorderThreshold} onChange={e => updateImportedItem(it.tempId, 'reorderThreshold', e.target.value)} style={{ fontSize: '0.83rem', textAlign: 'right' }} />
+                  <input type="text" value={it.sku} onChange={e => updateImportedItem(it.tempId, 'sku', e.target.value)} placeholder="SKU" style={{ fontSize: '0.83rem' }} />
+                  <button onClick={() => deleteImportedItem(it.tempId)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}><i className="fa-solid fa-xmark" /></button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, padding: '14px 28px 28px', borderTop: '1px solid rgba(11,42,74,0.08)', flexShrink: 0 }}>
+              <button className="btn-primary" onClick={handleApproveAll} disabled={approvingAll || importedItems.length === 0}>
+                {approvingAll && <span className="spinner" />}
+                <span><i className="fa-solid fa-check" /> Approve All ({importedItems.length})</span>
+              </button>
+              <button className="btn-danger-subtle" onClick={closeImportModal} disabled={approvingAll}>
+                <span><i className="fa-solid fa-trash" /> Discard Batch</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

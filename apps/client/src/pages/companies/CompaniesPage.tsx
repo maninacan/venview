@@ -92,7 +92,7 @@ export function CompaniesPage() {
       <div className="flex gap-3 mt-7 flex-wrap">
         {!showJoinForm ? (
           <button className="btn-secondary" onClick={() => setShowJoinForm(true)}>
-            🔗 Join a company
+            <i className="fa-solid fa-link" /> Join a company
           </button>
         ) : (
           <form onSubmit={handleJoin} className="flex gap-2 items-center flex-wrap">
@@ -105,7 +105,7 @@ export function CompaniesPage() {
               autoFocus
             />
             <button type="submit" className="btn-primary" disabled={joining}>
-              {joining && <span className="spinner" />} Join
+              {joining && <span className="spinner" />} <span>Join</span>
             </button>
             <button type="button" className="btn-secondary" onClick={() => setShowJoinForm(false)}>Cancel</button>
           </form>

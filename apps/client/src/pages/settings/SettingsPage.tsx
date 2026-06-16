@@ -203,13 +203,14 @@ export function SettingsPage() {
             <div style={{ marginTop: 14 }}>
               <button className="btn-primary" onClick={handleConnectSquare} disabled={connectingSquare}>
                 {connectingSquare && <span className="spinner" />}
+                <span>
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0 }}>
                   <rect x=".5" y=".5" width="5" height="5" rx=".8" fill="white"/>
                   <rect x="7.5" y=".5" width="5" height="5" rx=".8" fill="white"/>
                   <rect x=".5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
                   <rect x="7.5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
                 </svg>
-                Connect Square
+                Connect Square</span>
               </button>
               <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
                 Connect your Square account to automatically sync sales, locations, and labor.
@@ -241,7 +242,7 @@ export function SettingsPage() {
           ))}
         </div>
         <button className="btn-primary" onClick={saveCompanyDetails} disabled={savingCompany}>
-          {savingCompany && <span className="spinner" />} Save Details
+          {savingCompany && <span className="spinner" />} <span>Save Details</span>
         </button>
       </div>
 
@@ -302,7 +303,7 @@ export function SettingsPage() {
             <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter join code" style={{ width: 180, textTransform: 'uppercase' }} />
           </div>
           <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleJoinCode} disabled={joiningCode}>
-            {joiningCode && <span className="spinner" />} Add Member
+            {joiningCode && <span className="spinner" />} <span>Add Member</span>
           </button>
         </div>
       </div>
@@ -312,7 +313,7 @@ export function SettingsPage() {
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Subscription</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className={`inline-flex items-center text-[0.88rem] font-semibold px-[14px] py-1 rounded-full ${info?.plan === 'pro' ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
-            {info?.plan === 'pro' ? '⚡ Venview Pro' : '📋 Venview Starter'}
+            {info?.plan === 'pro' ? <><i className="fa-solid fa-bolt" /> Venview Pro</> : <><i className="fa-solid fa-clipboard-list" /> Venview Starter</>}
           </span>
           {info?.plan !== 'pro' && (
             <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>

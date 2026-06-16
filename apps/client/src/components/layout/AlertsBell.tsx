@@ -40,11 +40,11 @@ export function AlertsBell({ companyId }: Props) {
   return (
     <>
       <button
-        className="relative bg-transparent border-0 text-[rgba(255,255,255,0.82)] text-[1.1rem] cursor-pointer px-2.5 py-1.5 rounded-md ml-1 transition-colors hover:bg-[rgba(255,255,255,0.12)]"
+        className="relative bg-transparent border-0 text-[#555] text-[1.1rem] cursor-pointer px-2.5 py-1.5 rounded-md ml-1 transition-colors hover:bg-[rgba(11,42,74,0.06)]"
         onClick={() => setOpen(o => !o)}
         aria-label="Reorder alerts"
       >
-        🔔
+        <i className="fa-solid fa-bell" />
         {unread > 0 && (
           <span className="absolute top-0.5 right-0.5 bg-[#dc2626] text-white text-[0.62rem] font-bold min-w-[15px] h-[15px] rounded-full flex items-center justify-center px-[3px]">
             {unread}
@@ -59,7 +59,7 @@ export function AlertsBell({ companyId }: Props) {
             <div className="flex items-center px-3.5 py-3 border-b border-[#dde3f0] gap-2 text-[0.88rem] font-semibold">
               <strong>Reorder Alerts</strong>
               <button className="ml-auto bg-transparent border-0 text-[#0B2A4A] text-[0.78rem] cursor-pointer" onClick={() => markAll()}>Mark all read</button>
-              <button className="bg-transparent border-0 text-[#64748b] cursor-pointer text-[0.95rem]" onClick={() => setOpen(false)}>✕</button>
+              <button className="bg-transparent border-0 text-[#64748b] cursor-pointer text-[0.95rem]" onClick={() => setOpen(false)}><i className="fa-solid fa-xmark" /></button>
             </div>
             {alerts.length === 0 ? (
               <p className="px-3.5 py-4 text-[#64748b] text-[0.84rem]">No reorder alerts.</p>

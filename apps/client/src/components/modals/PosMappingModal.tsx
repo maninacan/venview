@@ -210,7 +210,7 @@ export function PosMappingModal({ companyId, onClose }: Props) {
         <div style={{ padding: '14px 26px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#fff' }}>
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn-primary" onClick={handleSave} disabled={saving || loading}>
-            {saving && <span className="spinner" />} Save Mappings
+            {saving && <span className="spinner" />} <span>Save Mappings</span>
           </button>
         </div>
       </div>

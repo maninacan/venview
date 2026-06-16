@@ -178,7 +178,7 @@ export function FormBuilderPage() {
               ))}
             </select>
           </div>
-          <button className="btn-secondary" onClick={useSelected} disabled={!selectedTemplateId}>⚡ Load</button>
+          <button className="btn-secondary" onClick={useSelected} disabled={!selectedTemplateId}><i className="fa-solid fa-bolt" /> Load</button>
         </div>
 
         {/* Required fields note */}
@@ -216,7 +216,7 @@ export function FormBuilderPage() {
                 <input type="text" value={builderOptions} onChange={e => setBuilderOptions(e.target.value)} placeholder="e.g. Red, Green, Blue" />
               </div>
             )}
-            <button className="btn-primary" onClick={addField} style={{ marginBottom: 0 }}>➕ Add Field</button>
+            <button className="btn-primary" onClick={addField} style={{ marginBottom: 0 }}><i className="fa-solid fa-plus" /> Add Field</button>
           </div>
         </div>
 
@@ -249,7 +249,7 @@ export function FormBuilderPage() {
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => moveField(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, width: 24, height: 24, cursor: i === 0 ? 'not-allowed' : 'pointer', color: 'var(--muted)', fontSize: '0.75rem' }}>↑</button>
                     <button onClick={() => moveField(i, 1)} disabled={i === fields.length - 1} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, width: 24, height: 24, cursor: i === fields.length - 1 ? 'not-allowed' : 'pointer', color: 'var(--muted)', fontSize: '0.75rem' }}>↓</button>
-                    <button onClick={() => removeField(i)} disabled={REQUIRED_FIELDS.includes(field.label)} style={{ background: 'none', border: 'none', color: REQUIRED_FIELDS.includes(field.label) ? '#ccc' : '#dc2626', cursor: REQUIRED_FIELDS.includes(field.label) ? 'not-allowed' : 'pointer', fontSize: '0.9rem' }}>✕</button>
+                    <button onClick={() => removeField(i)} disabled={REQUIRED_FIELDS.includes(field.label)} style={{ background: 'none', border: 'none', color: REQUIRED_FIELDS.includes(field.label) ? '#ccc' : '#dc2626', cursor: REQUIRED_FIELDS.includes(field.label) ? 'not-allowed' : 'pointer', fontSize: '0.9rem' }}><i className="fa-solid fa-xmark" /></button>
                   </div>
                 </div>
               ))}
@@ -259,9 +259,9 @@ export function FormBuilderPage() {
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving && <span className="spinner" />} 💾 Save Template
+            {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> Save Template</span>
           </button>
-          <button className="btn-secondary" onClick={clearBuilder}>🧹 Clear</button>
+          <button className="btn-secondary" onClick={clearBuilder}><i className="fa-solid fa-broom" /> Clear</button>
         </div>
       </div>
 
@@ -278,10 +278,10 @@ export function FormBuilderPage() {
                   <span style={{ marginLeft: 8, fontSize: '0.78rem', color: 'var(--muted)' }}>{tmpl.fields.length} fields</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => { loadTemplate(tmpl.id); window.scrollTo(0, 0); }}>✏️ Edit</button>
+                  <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => { loadTemplate(tmpl.id); window.scrollTo(0, 0); }}><i className="fa-solid fa-pen-to-square" /> Edit</button>
                   {!tmpl.isActive && (
                     <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} disabled={activatingId === tmpl.id} onClick={() => handleActivate(tmpl.id)}>
-                      {activatingId === tmpl.id && <span className="spinner" />} ⚡ Activate
+                      {activatingId === tmpl.id && <span className="spinner" />} <span><i className="fa-solid fa-bolt" /> Activate</span>
                     </button>
                   )}
                 </div>

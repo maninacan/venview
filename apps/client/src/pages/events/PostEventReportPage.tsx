@@ -242,7 +242,7 @@ export function PostEventReportPage() {
         {/* Header */}
         <div style={{ borderBottom: '2px solid var(--vv-navy)', paddingBottom: 16, marginBottom: 20 }}>
           <h1 style={{ margin: '0 0 4px', fontSize: '1.6rem', color: 'var(--vv-navy)', fontFamily: 'DM Serif Display, serif' }}>
-            📊 Post-Event Report
+            <i className="fa-solid fa-chart-bar" /> Post-Event Report
           </h1>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--vv-navy)', marginBottom: 2 }}>
             {event?.eventName}

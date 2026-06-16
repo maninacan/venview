@@ -25,7 +25,6 @@ import FilterBar from '../filter-bar/filter-bar';
 import Pagination from '../pagination/pagination';
 import SimpleBar from 'simplebar-react';
 import 'simplebar/dist/simplebar.min.css';
-import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 
 export interface TableProps<T extends BasicTableDataRow> {
   dataTestId?: string;
@@ -154,7 +153,7 @@ export function Table<T extends BasicTableDataRow>({
           </div>
           {handleSearch && (
             <div className="min-w-[280px] w-[340px] h-[38px] max-sm:w-full max-sm:min-w-0 px-3 py-2 bg-stone-50 rounded-lg justify-start items-center gap-2 inline-flex group ring-1 ring-gray-300">
-              <MagnifyingGlassIcon className="w-[18px] h-[18px] text-gray-400 flex-shrink-0" />
+              <i className="fa-solid fa-magnifying-glass text-gray-400 flex-shrink-0 text-[15px]" />
               <input
                 value={searchValue}
                 onChange={(e) => handleSearch(e.target.value)}
