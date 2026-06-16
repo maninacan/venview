@@ -3,6 +3,10 @@
 # compiled output
 dist
 tmp
+
+# logs
+logs/
+*.log
 out-tsc
 
 # dependencies

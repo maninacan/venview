@@ -10,6 +10,7 @@ import { createContext } from './context/index.js';
 import healthRouter from './routes/health.js';
 import squareRouter from './routes/square.js';
 import uploadsRouter from './routes/uploads.js';
+import logger from './lib/logger.js';
 
 const host = process.env['HOST'] ?? 'localhost';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 3000;
@@ -39,6 +40,21 @@ async function main() {
 
   app.use(express.json());
 
+  // HTTP request logging
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      logger.info('http', {
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        durationMs: Date.now() - start,
+        ip: req.ip,
+      });
+    });
+    next();
+  });
+
   // REST routes
   app.use('/api', healthRouter);
   app.use('/api', squareRouter);
@@ -53,11 +69,11 @@ async function main() {
   );
 
   httpServer.listen({ port, host }, () => {
-    console.log(`[ ready ] http://${host}:${port}/graphql`);
+    logger.info(`server ready at http://${host}:${port}/graphql`);
   });
 }
 
 main().catch((err) => {
-  console.error('Failed to start server:', err);
+  logger.error('Failed to start server', { error: err });
   process.exit(1);
 });
