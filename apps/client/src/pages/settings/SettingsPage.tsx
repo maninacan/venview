@@ -203,13 +203,14 @@ export function SettingsPage() {
             <div style={{ marginTop: 14 }}>
               <button className="btn-primary" onClick={handleConnectSquare} disabled={connectingSquare}>
                 {connectingSquare && <span className="spinner" />}
+                <span>
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0 }}>
                   <rect x=".5" y=".5" width="5" height="5" rx=".8" fill="white"/>
                   <rect x="7.5" y=".5" width="5" height="5" rx=".8" fill="white"/>
                   <rect x=".5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
                   <rect x="7.5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
                 </svg>
-                Connect Square
+                Connect Square</span>
               </button>
               <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
                 Connect your Square account to automatically sync sales, locations, and labor.
@@ -241,7 +242,7 @@ export function SettingsPage() {
           ))}
         </div>
         <button className="btn-primary" onClick={saveCompanyDetails} disabled={savingCompany}>
-          {savingCompany && <span className="spinner" />} Save Details
+          {savingCompany && <span className="spinner" />} <span>Save Details</span>
         </button>
       </div>
 
@@ -302,7 +303,7 @@ export function SettingsPage() {
             <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter join code" style={{ width: 180, textTransform: 'uppercase' }} />
           </div>
           <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleJoinCode} disabled={joiningCode}>
-            {joiningCode && <span className="spinner" />} Add Member
+            {joiningCode && <span className="spinner" />} <span>Add Member</span>
           </button>
         </div>
       </div>

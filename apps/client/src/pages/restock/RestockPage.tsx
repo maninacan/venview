@@ -160,7 +160,7 @@ export function RestockPage() {
                       onClick={() => handleRestock(item)}
                     >
                       {restockingId === item.id && <span className="spinner" />}
-                      ✅ Mark Restocked
+                      <span>✅ Mark Restocked</span>
                     </button>
                   </div>
                 </div>

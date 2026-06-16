@@ -277,7 +277,7 @@ function SyncSquareSalesButton({ eventId, squareLocationId, onSynced }: { eventI
   return (
     <button className="btn-primary" onClick={handleSync} disabled={syncing}>
       {syncing && <span className="spinner" />}
-      <i className="fa-solid fa-arrows-rotate" /> Pull Square Sales
+      <span><i className="fa-solid fa-arrows-rotate" /> Pull Square Sales</span>
     </button>
   );
 }
@@ -319,7 +319,7 @@ function ManualSalesForm({ eventId, sales, onSaved }: { eventId: string; sales: 
       ))}
       <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
         <button className="btn-primary" onClick={save} disabled={saving} style={{ fontSize: '0.86rem' }}>
-          {saving && <span className="spinner" />} <i className="fa-solid fa-floppy-disk" /> Save Sales Data
+          {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> Save Sales Data</span>
         </button>
       </div>
     </div>
@@ -353,7 +353,7 @@ function AdjustmentForm({ eventId, field, label, currentValue, onSaved }: { even
         <input type="number" step="0.01" value={val} onChange={e => setVal(e.target.value)} />
       </div>
       <button className="btn-primary" onClick={save} disabled={saving} style={{ fontSize: '0.86rem', marginBottom: 0 }}>
-        {saving && <span className="spinner" />} Save
+        {saving && <span className="spinner" />} <span>Save</span>
       </button>
     </div>
   );
@@ -447,7 +447,7 @@ function LaborSection({ eventId, companyId, laborEntries, onSaved }: { eventId: 
           <input type="number" step="0.01" value={form.wage} onChange={e => setForm(f => ({ ...f, wage: e.target.value }))} style={{ width: 90 }} />
         </div>
         <button className="btn-primary" onClick={addShift} disabled={saving} style={{ marginBottom: 0 }}>
-          {saving && <span className="spinner" />} + Add Shift
+          {saving && <span className="spinner" />} <span>+ Add Shift</span>
         </button>
       </div>
     </div>
@@ -504,7 +504,7 @@ function AdditionalFeesSection({ eventId, fees, onSaved }: { eventId: string; fe
           <label htmlFor="feeDiscount" style={{ marginBottom: 0 }}>Discount</label>
         </div>
         <button className="btn-primary" onClick={addFee} disabled={saving} style={{ marginBottom: 0 }}>
-          {saving && <span className="spinner" />} + Add
+          {saving && <span className="spinner" />} <span>+ Add</span>
         </button>
       </div>
     </div>
@@ -557,7 +557,7 @@ function ExpensesForm({ eventId, expenses, onSaved }: { eventId: string; expense
         ))}
       </div>
       <button className="btn-primary" onClick={save} disabled={saving} style={{ marginTop: 12, fontSize: '0.86rem' }}>
-        {saving && <span className="spinner" />} <i className="fa-solid fa-floppy-disk" /> Save Expenses
+        {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> Save Expenses</span>
       </button>
     </div>
   );

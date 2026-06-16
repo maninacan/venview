@@ -100,7 +100,7 @@ export function CreateCompanyPage() {
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button type="submit" className="btn-primary" disabled={loading}>
                 {loading && <span className="spinner" />}
-                Create Company
+                <span>Create Company</span>
               </button>
               <button type="button" className="btn-secondary" onClick={() => navigate('/companies')}>
                 Cancel

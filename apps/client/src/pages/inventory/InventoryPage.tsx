@@ -167,7 +167,7 @@ export function InventoryPage() {
             </label>
             <span className="text-[0.82rem] text-[#64748b]">{fileName}</span>
             <button className="btn-primary" onClick={handleUpload} disabled={uploading}>
-              {uploading && <span className="spinner" />} ⬆ Upload
+              {uploading && <span className="spinner" />} <span>⬆ Upload</span>
             </button>
             <button className="btn-secondary" onClick={downloadTemplate}>⬇ Download Template</button>
             <button className="btn-danger" onClick={handleClearAll}><i className="fa-solid fa-trash" /> Clear All</button>

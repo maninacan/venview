@@ -105,7 +105,7 @@ export function CompaniesPage() {
               autoFocus
             />
             <button type="submit" className="btn-primary" disabled={joining}>
-              {joining && <span className="spinner" />} Join
+              {joining && <span className="spinner" />} <span>Join</span>
             </button>
             <button type="button" className="btn-secondary" onClick={() => setShowJoinForm(false)}>Cancel</button>
           </form>

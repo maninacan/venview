@@ -148,7 +148,7 @@ export function AuthPage() {
             <div className="text-[#dc2626] text-[0.85rem] min-h-5 mb-2">{error}</div>
             <button type="submit" className="btn-primary w-full justify-center py-[11px] text-base" disabled={loading}>
               {loading && <span className="spinner" />}
-              {mode === 'signin' ? 'Sign In' : 'Sign Up'}
+              <span>{mode === 'signin' ? 'Sign In' : 'Sign Up'}</span>
             </button>
           </form>
 

@@ -259,7 +259,7 @@ export function FormBuilderPage() {
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving && <span className="spinner" />} <i className="fa-solid fa-floppy-disk" /> Save Template
+            {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> Save Template</span>
           </button>
           <button className="btn-secondary" onClick={clearBuilder}><i className="fa-solid fa-broom" /> Clear</button>
         </div>
@@ -281,7 +281,7 @@ export function FormBuilderPage() {
                   <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => { loadTemplate(tmpl.id); window.scrollTo(0, 0); }}><i className="fa-solid fa-pen-to-square" /> Edit</button>
                   {!tmpl.isActive && (
                     <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} disabled={activatingId === tmpl.id} onClick={() => handleActivate(tmpl.id)}>
-                      {activatingId === tmpl.id && <span className="spinner" />} <i className="fa-solid fa-bolt" /> Activate
+                      {activatingId === tmpl.id && <span className="spinner" />} <span><i className="fa-solid fa-bolt" /> Activate</span>
                     </button>
                   )}
                 </div>
