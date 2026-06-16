@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { showToast } from '@org/data';
+import { showToast, useAuth } from '@org/data';
 import { PosMappingModal } from '../../components/modals/PosMappingModal';
 
 const GET_SETTINGS = gql`
   query GetSettings($companyId: ID!) {
     company(id: $companyId) {
-      id name phone contactName vendorCategory email joinCode plan
+      id name phone contactName vendorCategory email joinCode plan pendingOwnerId
       members { userId email role }
+      pendingRequests { userId email role }
       squareStatus { connected locationName locationId }
     }
   }
@@ -30,9 +31,39 @@ const LEAVE = gql`
     leaveCompany(companyId: $companyId)
   }
 `;
-const JOIN = gql`
-  mutation JoinCompany($joinCode: String!) {
-    joinCompany(joinCode: $joinCode) { id name }
+const REQUEST_ACCESS = gql`
+  mutation RequestAccess($joinCode: String!) {
+    requestAccess(joinCode: $joinCode) { companyName status }
+  }
+`;
+const APPROVE_MEMBER = gql`
+  mutation ApproveMember($companyId: ID!, $userId: ID!) {
+    approveMember(companyId: $companyId, userId: $userId)
+  }
+`;
+const INVITE_MEMBER = gql`
+  mutation InviteMember($companyId: ID!, $email: String!) {
+    inviteMember(companyId: $companyId, email: $email) { email status }
+  }
+`;
+const OFFER_OWNERSHIP = gql`
+  mutation OfferOwnership($companyId: ID!, $newOwnerId: ID!) {
+    offerOwnership(companyId: $companyId, newOwnerId: $newOwnerId)
+  }
+`;
+const ACCEPT_OWNERSHIP = gql`
+  mutation AcceptOwnership($companyId: ID!) {
+    acceptOwnership(companyId: $companyId)
+  }
+`;
+const DECLINE_OWNERSHIP = gql`
+  mutation DeclineOwnership($companyId: ID!) {
+    declineOwnership(companyId: $companyId)
+  }
+`;
+const DELETE_COMPANY = gql`
+  mutation DeleteCompany($id: ID!) {
+    deleteCompany(id: $id)
   }
 `;
 
@@ -41,10 +72,18 @@ const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost
 export function SettingsPage() {
   const { companyId, company } = useCurrentCompany();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [updateCompany] = useMutation(UPDATE_COMPANY);
   const [removeMember] = useMutation(REMOVE_MEMBER);
   const [leaveCompany] = useMutation(LEAVE);
-  const [joinCompany] = useMutation(JOIN);
+  const [requestAccess] = useMutation(REQUEST_ACCESS);
+  const [approveMember] = useMutation(APPROVE_MEMBER);
+  const [inviteMember] = useMutation(INVITE_MEMBER);
+  const [offerOwnership] = useMutation(OFFER_OWNERSHIP);
+  const [acceptOwnership] = useMutation(ACCEPT_OWNERSHIP);
+  const [declineOwnership] = useMutation(DECLINE_OWNERSHIP);
+  const [deleteCompany] = useMutation(DELETE_COMPANY);
+  const { user } = useAuth();
 
   const { data, loading, refetch } = useQuery(GET_SETTINGS, {
     variables: { companyId },
@@ -57,10 +96,23 @@ export function SettingsPage() {
   const [connectingSquare, setConnectingSquare] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joiningCode, setJoiningCode] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteCooldown, setInviteCooldown] = useState(0);
+  const [transferTo, setTransferTo] = useState('');
 
   const info = data?.company;
   const squareStatus = info?.squareStatus;
   const members = info?.members ?? [];
+  const pendingRequests = info?.pendingRequests ?? [];
+  const isOwner = members.some((m: { userId: string; role: string }) => m.userId === user?.id && m.role === 'owner');
+
+  // Tick down the invite cooldown.
+  useEffect(() => {
+    if (inviteCooldown <= 0) return;
+    const t = setInterval(() => setInviteCooldown(c => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(t);
+  }, [inviteCooldown > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prefill company form
   useEffect(() => {
@@ -151,14 +203,144 @@ export function SettingsPage() {
     if (!joinCode.trim()) return;
     setJoiningCode(true);
     try {
-      const { data: result } = await joinCompany({ variables: { joinCode: joinCode.trim().toUpperCase() } });
-      showToast(`Joined ${result.joinCompany.name}!`, 'success');
+      const { data: result } = await requestAccess({ variables: { joinCode: joinCode.trim().toUpperCase() } });
+      const { companyName, status } = result.requestAccess;
+      if (status === 'active') {
+        showToast(`You're already a member of ${companyName}.`, 'info');
+      } else {
+        showToast(`Access requested for ${companyName} — pending owner approval.`, 'success', 6000);
+      }
       setJoinCode('');
-      refetch();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Invalid join code', 'error');
     } finally { setJoiningCode(false); }
   }
+
+  async function handleInvite() {
+    const email = inviteEmail.trim();
+    if (!email || inviteCooldown > 0) return;
+    setInviting(true);
+    try {
+      const { data: result } = await inviteMember({ variables: { companyId, email } });
+      const { email: invitedEmail, status } = result.inviteMember;
+      if (status === 'invited') {
+        showToast(`Invitation email sent to ${invitedEmail}.`, 'success', 6000);
+        // New-user invites send an email — brief cooldown to avoid tripping the rate limit.
+        setInviteCooldown(30);
+      } else if (status === 'added') {
+        showToast(`${invitedEmail} added to the team.`, 'success');
+      } else {
+        showToast(`${invitedEmail} is already a member.`, 'info');
+      }
+      setInviteEmail('');
+      refetch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const match = msg.match(/after (\d+) seconds/i);
+      if (match || /security purposes|rate limit|too many requests/i.test(msg)) {
+        const secs = match ? parseInt(match[1], 10) : 30;
+        setInviteCooldown(secs);
+        showToast(`Please wait ${secs}s before sending another invite — email sending is rate-limited.`, 'warning', 6000);
+      } else {
+        showToast(msg || 'Failed to invite member', 'error');
+      }
+    } finally { setInviting(false); }
+  }
+
+  async function handleApprove(userId: string, email: string) {
+    try {
+      await approveMember({ variables: { companyId, userId } });
+      showToast(`${email} approved.`, 'success');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to approve request', 'error');
+    }
+  }
+
+  async function handleDeny(userId: string, email: string) {
+    if (!confirm(`Deny ${email}'s access request?`)) return;
+    try {
+      await removeMember({ variables: { companyId, userId } });
+      showToast('Request denied.', 'info');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to deny request', 'error');
+    }
+  }
+
+  async function handleLeave() {
+    if (!confirm(`Leave ${info?.name ?? 'this company'}? You'll lose access until you're invited again.`)) return;
+    try {
+      await leaveCompany({ variables: { companyId } });
+      showToast('You left the company.', 'info');
+      navigate('/companies');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to leave company', 'error');
+    }
+  }
+
+  async function handleOffer() {
+    if (!transferTo) return;
+    const target = members.find((m: { userId: string; email: string }) => m.userId === transferTo);
+    if (!confirm(`Offer ownership of ${info?.name ?? 'this company'} to ${target?.email}? It only takes effect once they accept.`)) return;
+    try {
+      await offerOwnership({ variables: { companyId, newOwnerId: transferTo } });
+      showToast(`Ownership offered to ${target?.email} — awaiting their approval.`, 'success', 6000);
+      setTransferTo('');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to offer ownership', 'error');
+    }
+  }
+
+  async function handleCancelOffer() {
+    try {
+      await declineOwnership({ variables: { companyId } });
+      showToast('Ownership offer cancelled.', 'info');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to cancel offer', 'error');
+    }
+  }
+
+  async function handleAcceptOwnership() {
+    if (!confirm(`Accept ownership of ${info?.name ?? 'this company'}? You'll become the owner and take over billing and team management.`)) return;
+    try {
+      await acceptOwnership({ variables: { companyId } });
+      showToast('You are now the owner.', 'success');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to accept ownership', 'error');
+    }
+  }
+
+  async function handleDeclineOffer() {
+    try {
+      await declineOwnership({ variables: { companyId } });
+      showToast('Ownership offer declined.', 'info');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to decline offer', 'error');
+    }
+  }
+
+  async function handleDeleteCompany() {
+    if (!confirm(`Delete ${info?.name ?? 'this company'}? This permanently removes all its events, recipes, inventory, and team. This cannot be undone.`)) return;
+    try {
+      await deleteCompany({ variables: { id: companyId } });
+      showToast('Company deleted.', 'info');
+      navigate('/companies');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete company', 'error');
+    }
+  }
+
+  const otherMembers = members.filter((m: { userId: string }) => m.userId !== user?.id);
+  const pendingOwnerId = info?.pendingOwnerId ?? null;
+  const pendingOwnerEmail = pendingOwnerId
+    ? members.find((m: { userId: string; email: string }) => m.userId === pendingOwnerId)?.email ?? 'a member'
+    : null;
+  const isPendingRecipient = !!pendingOwnerId && pendingOwnerId === user?.id;
 
   if (loading) return <div className="card"><p style={{ color: 'var(--muted)' }}>Loading…</p></div>;
 
@@ -296,14 +478,60 @@ export function SettingsPage() {
           </table>
         )}
 
-        {/* Add member by join code */}
+        {/* Invite member by email (owner only) */}
+        {isOwner && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
+            <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+              <label style={{ fontSize: '0.8rem' }}>Invite member by email</label>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleInvite(); }}
+                placeholder="name@example.com"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleInvite} disabled={inviting || !inviteEmail.trim() || inviteCooldown > 0}>
+              {inviting && <span className="spinner" />} <span>{inviteCooldown > 0 ? <>Wait {inviteCooldown}s</> : <><i className="fa-solid fa-user-plus" /> Invite</>}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Pending access requests (owner only) */}
+        {isOwner && pendingRequests.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
+              Pending requests ({pendingRequests.length})
+            </p>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <tbody>
+                {pendingRequests.map((r: { userId: string; email: string }) => (
+                  <tr key={r.userId}>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>{r.email}</td>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button className="btn-primary" style={{ fontSize: '0.75rem', padding: '2px 10px', marginRight: 6 }} onClick={() => handleApprove(r.userId, r.email)}>
+                        Approve
+                      </button>
+                      <button className="btn-danger-subtle" style={{ fontSize: '0.75rem', padding: '2px 10px' }} onClick={() => handleDeny(r.userId, r.email)}>
+                        Deny
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Request access via join code */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.8rem' }}>Add member via join code</label>
+            <label style={{ fontSize: '0.8rem' }}>Request access via join code</label>
             <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter join code" style={{ width: 180, textTransform: 'uppercase' }} />
           </div>
           <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleJoinCode} disabled={joiningCode}>
-            {joiningCode && <span className="spinner" />} <span>Add Member</span>
+            {joiningCode && <span className="spinner" />} <span>Request Access</span>
           </button>
         </div>
       </div>
@@ -321,6 +549,82 @@ export function SettingsPage() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Membership / danger zone */}
+      <div className="card" style={{ borderColor: 'rgba(220,38,38,0.25)' }}>
+        <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 12px' }}>
+          {isOwner ? 'Owner controls' : 'Leave company'}
+        </p>
+
+        {/* Recipient of a pending ownership offer */}
+        {isPendingRecipient && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+            <p className="text-[#92400e] text-[0.88rem] font-semibold mt-0 mb-1">
+              <i className="fa-solid fa-crown" /> You've been offered ownership of {info?.name ?? 'this company'}.
+            </p>
+            <p className="text-[#92400e] text-[0.82rem] mt-0 mb-3">Accepting makes you the owner, with control over billing and the team.</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleAcceptOwnership}>
+                <i className="fa-solid fa-check" /> Accept ownership
+              </button>
+              <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={handleDeclineOffer}>
+                Decline
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isOwner && (
+          <>
+            <p className="text-[#64748b] text-[0.86rem] mt-0 mb-3">
+              Remove yourself from {info?.name ?? 'this company'}. You'll lose access until an owner invites you back.
+            </p>
+            <button className="btn-danger-subtle" onClick={handleLeave}>
+              <i className="fa-solid fa-right-from-bracket" /> Leave company
+            </button>
+          </>
+        )}
+
+        {isOwner && (
+          <>
+            <p className="text-[#64748b] text-[0.86rem] mt-0 mb-3">
+              As the owner you can't leave directly. Transfer the company to another member (they must accept; you'll become a regular member and can then leave), or delete it entirely.
+            </p>
+
+            {pendingOwnerId ? (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18, background: '#f8fafc', borderRadius: 8, padding: '10px 14px' }}>
+                <span className="text-[0.85rem] text-[#0B2A4A]">
+                  <i className="fa-solid fa-clock" style={{ color: 'var(--muted)' }} /> Ownership offer pending — awaiting <strong>{pendingOwnerEmail}</strong>'s approval.
+                </span>
+                <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '3px 10px' }} onClick={handleCancelOffer}>
+                  Cancel offer
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 18 }}>
+                <div className="form-group" style={{ margin: 0, minWidth: 220 }}>
+                  <label style={{ fontSize: '0.8rem' }}>Transfer ownership to</label>
+                  <select value={transferTo} onChange={e => setTransferTo(e.target.value)} disabled={otherMembers.length === 0} style={{ width: '100%' }}>
+                    <option value="">{otherMembers.length === 0 ? 'No other members yet' : 'Select a member…'}</option>
+                    {otherMembers.map((m: { userId: string; email: string }) => (
+                      <option key={m.userId} value={m.userId}>{m.email}</option>
+                    ))}
+                  </select>
+                </div>
+                <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={handleOffer} disabled={!transferTo}>
+                  <i className="fa-solid fa-crown" /> Offer ownership
+                </button>
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+              <button className="btn-danger" onClick={handleDeleteCompany}>
+                <i className="fa-solid fa-trash" /> Delete company
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {showPosMappings && companyId && (

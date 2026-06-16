@@ -18,9 +18,9 @@ const GET_MY_COMPANIES = gql`
   }
 `;
 
-const JOIN_COMPANY = gql`
-  mutation JoinCompany($joinCode: String!) {
-    joinCompany(joinCode: $joinCode) { id name }
+const REQUEST_ACCESS = gql`
+  mutation RequestAccess($joinCode: String!) {
+    requestAccess(joinCode: $joinCode) { companyName status }
   }
 `;
 
@@ -30,7 +30,7 @@ export function CompaniesPage() {
   const [joining, setJoining] = useState(false);
 
   const { data, loading, refetch } = useQuery(GET_MY_COMPANIES);
-  const [joinCompany] = useMutation(JOIN_COMPANY);
+  const [requestAccess] = useMutation(REQUEST_ACCESS);
   const [showWelcome, setShowWelcome] = useState(false);
   const [firstCompanyId, setFirstCompanyId] = useState('');
 
@@ -52,11 +52,16 @@ export function CompaniesPage() {
     if (!joinCode.trim()) return;
     setJoining(true);
     try {
-      const { data: result } = await joinCompany({ variables: { joinCode: joinCode.trim().toUpperCase() } });
-      showToast(`Joined ${result.joinCompany.name}!`, 'success');
+      const { data: result } = await requestAccess({ variables: { joinCode: joinCode.trim().toUpperCase() } });
+      const { companyName, status } = result.requestAccess;
+      if (status === 'active') {
+        showToast(`You're already a member of ${companyName}.`, 'info');
+        refetch();
+      } else {
+        showToast(`Access requested for ${companyName} — pending owner approval.`, 'success', 6000);
+      }
       setJoinCode('');
       setShowJoinForm(false);
-      refetch();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Invalid join code', 'error');
     } finally {
@@ -92,7 +97,7 @@ export function CompaniesPage() {
       <div className="flex gap-3 mt-7 flex-wrap">
         {!showJoinForm ? (
           <button className="btn-secondary" onClick={() => setShowJoinForm(true)}>
-            <i className="fa-solid fa-link" /> Join a company
+            <i className="fa-solid fa-link" /> Request to join a company
           </button>
         ) : (
           <form onSubmit={handleJoin} className="flex gap-2 items-center flex-wrap">
@@ -105,7 +110,7 @@ export function CompaniesPage() {
               autoFocus
             />
             <button type="submit" className="btn-primary" disabled={joining}>
-              {joining && <span className="spinner" />} <span>Join</span>
+              {joining && <span className="spinner" />} <span>Request access</span>
             </button>
             <button type="button" className="btn-secondary" onClick={() => setShowJoinForm(false)}>Cancel</button>
           </form>

@@ -25,7 +25,22 @@ export const typeDefs = `#graphql
     currentPeriodEnd: String
     createdAt: String
     members: [CompanyMember!]!
+    pendingRequests: [CompanyMember!]!
+    "User id with a pending ownership offer, if any."
+    pendingOwnerId: ID
     squareStatus: SquareStatus
+  }
+
+  type AccessRequestResult {
+    companyName: String!
+    "'pending' for a new/awaiting request, 'active' if already a member."
+    status: String!
+  }
+
+  type InviteResult {
+    email: String!
+    "'invited' (email sent to a new user), 'added' (existing user added), or 'exists' (already a member)."
+    status: String!
   }
 
   type CompanyMember {
@@ -533,8 +548,13 @@ export const typeDefs = `#graphql
     createCompany(input: CreateCompanyInput!): Company!
     updateCompany(id: ID!, input: UpdateCompanyInput!): Company!
     deleteCompany(id: ID!): Boolean!
-    joinCompany(joinCode: String!): Company!
+    requestAccess(joinCode: String!): AccessRequestResult!
+    approveMember(companyId: ID!, userId: ID!): Boolean!
+    inviteMember(companyId: ID!, email: String!): InviteResult!
     leaveCompany(companyId: ID!): Boolean!
+    offerOwnership(companyId: ID!, newOwnerId: ID!): Boolean!
+    acceptOwnership(companyId: ID!): Boolean!
+    declineOwnership(companyId: ID!): Boolean!
     removeMember(companyId: ID!, userId: ID!): Boolean!
 
     # Events

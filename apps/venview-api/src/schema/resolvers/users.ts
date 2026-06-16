@@ -10,7 +10,8 @@ export const userResolvers = {
       const { data: companies } = await supabase
         .from('CompanyMembers')
         .select('companyId, role, Companies(*)')
-        .eq('userId', ctx.user.id);
+        .eq('userId', ctx.user.id)
+        .eq('status', 'active');
 
       const companyList = (companies ?? []).map((row: Record<string, unknown>) => {
         const company = row['Companies'] as Record<string, unknown>;

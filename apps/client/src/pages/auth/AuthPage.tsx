@@ -14,6 +14,8 @@ export function AuthPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signupSent, setSignupSent] = useState(false);
+  const [resent, setResent] = useState(false);
 
   // Forgot password modal state
   const [showForgot, setShowForgot] = useState(false);
@@ -51,14 +53,24 @@ export function AuthPage() {
     setError('');
     setLoading(true);
     try {
-      const { error: authError } = mode === 'signup'
-        ? await supabase.auth.signUp({ email, password })
-        : await supabase.auth.signInWithPassword({ email, password });
-
-      if (authError) {
-        setError(authError.message || 'Authentication failed.');
+      if (mode === 'signup') {
+        const { data, error: authError } = await supabase.auth.signUp({ email, password });
+        if (authError) {
+          setError(authError.message || 'Authentication failed.');
+        } else if (data.session) {
+          // Email confirmation disabled — signed in immediately.
+          navigate(returnTo ?? '/companies');
+        } else {
+          // Confirmation required — verification email sent, no session yet.
+          setSignupSent(true);
+        }
       } else {
-        navigate(returnTo ?? '/companies');
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) {
+          setError(authError.message || 'Authentication failed.');
+        } else {
+          navigate(returnTo ?? '/companies');
+        }
       }
     } catch {
       setError('Unable to connect. Please try again.');
@@ -117,6 +129,43 @@ export function AuthPage() {
             <span className="block text-[0.8rem] text-[#64748b] mt-0.5">Vendor Intelligence for Events</span>
           </div>
 
+          {signupSent ? (
+            <div className="text-center py-2">
+              <div className="text-[2.4rem] mb-2" style={{ color: '#2E7D32' }}>
+                <i className="fa-solid fa-envelope-circle-check" />
+              </div>
+              <h2 className="mt-0 mb-1.5 text-[1.25rem] font-bold text-[#0B2A4A]">Check your email</h2>
+              <p className="mt-0 mb-5 text-[0.88rem] text-[#64748b]">
+                We've sent a verification link to <strong className="text-[#0B2A4A]">{email}</strong>. Click it to activate your account, then sign in.
+              </p>
+              <button
+                type="button"
+                className="btn-primary w-full justify-center py-[11px] text-base"
+                onClick={() => { setSignupSent(false); setMode('signin'); setPassword(''); setError(''); }}
+              >
+                <span>Back to Sign In</span>
+              </button>
+              <p className="text-center text-[0.82rem] text-[#64748b] mt-3.5">
+                Didn't get it? Check your spam folder, or{' '}
+                <a
+                  href="#"
+                  className="text-[#0B2A4A] font-semibold no-underline hover:underline"
+                  onClick={async e => {
+                    e.preventDefault();
+                    setResent(false);
+                    const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email });
+                    if (resendErr) { setError(resendErr.message); }
+                    else { setError(''); setResent(true); }
+                  }}
+                >
+                  resend the email
+                </a>.
+              </p>
+              {resent && <div className="text-[#166534] text-[0.85rem] mt-1">Verification email resent.</div>}
+              {error && <div className="text-[#dc2626] text-[0.85rem] mt-1">{error}</div>}
+            </div>
+          ) : (
+          <>
           <h2 className="mt-0 mb-1.5 text-[1.25rem] font-bold text-[#0B2A4A]">
             {mode === 'signin' ? 'Sign In' : 'Sign Up'}
           </h2>
@@ -173,6 +222,8 @@ export function AuthPage() {
                 Forgot Password?
               </a>
             </p>
+          )}
+          </>
           )}
         </div>
       </div>

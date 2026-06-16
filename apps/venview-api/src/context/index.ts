@@ -40,6 +40,7 @@ export async function requireCompanyMember(
     .select('role')
     .eq('companyId', companyId)
     .eq('userId', userId)
+    .eq('status', 'active')
     .single();
 
   if (error || !data) throw new Error('Forbidden: not a member of this company');
