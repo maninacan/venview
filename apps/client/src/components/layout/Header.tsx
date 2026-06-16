@@ -75,6 +75,7 @@ export function Header({ companyId, companyName }: Props) {
               <NavLink to={`/companies/${companyId}/inventory`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}>My Inventory</NavLink>
               <NavLink to={`/companies/${companyId}/restock`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-arrows-rotate" /> Restock</NavLink>
               <NavLink to={`/companies/${companyId}/form-builder`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}>Form Builder</NavLink>
+              <NavLink to={`/companies/${companyId}/billing`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}>💳 Billing</NavLink>
               <NavLink to={`/companies/${companyId}/settings`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}>Settings</NavLink>
             </>
           )}

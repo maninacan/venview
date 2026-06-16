@@ -11,6 +11,7 @@ import { RecipesPage } from '../pages/recipes/RecipesPage';
 import { RestockPage } from '../pages/restock/RestockPage';
 import { FormBuilderPage } from '../pages/form-builder/FormBuilderPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
+import { BillingPage } from '../pages/billing/BillingPage';
 import { CompanyLayout, RootLayout } from '../components/layout/Layout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ErrorElement } from '../components/layout/ErrorElement';
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { path: 'restock', element: <RestockPage /> },
       { path: 'form-builder', element: <FormBuilderPage /> },
       { path: 'settings', element: <SettingsPage />, errorElement: <ErrorElement /> },
+      { path: 'billing', element: <BillingPage />, errorElement: <ErrorElement /> },
     ],
   },
 

@@ -418,7 +418,7 @@ router.post('/uploads/permit', upload.array('files', 10), async (req: Request, r
     const files = req.files as Express.Multer.File[];
     if (!files?.length) return void res.status(400).json({ error: 'No files uploaded' });
 
-    const results: Array<{ fileName: string; fileUrl: string }> = [];
+    const results: Array<{ fileName: string; fileUrl: string | null }> = [];
 
     for (const file of files) {
       const path = `permits/${eventId}/${Date.now()}_${file.originalname}`;
@@ -431,16 +431,19 @@ router.post('/uploads/permit', upload.array('files', 10), async (req: Request, r
         continue;
       }
 
-      const { data: { publicUrl } } = supabase.storage.from('venview-permits').getPublicUrl(path);
-
       await supabase.from('Permits').insert({
         eventID: eventId,
         fileName: file.originalname,
-        fileUrl: publicUrl,
+        filePath: path,
         uploadedAt: new Date().toISOString(),
       });
 
-      results.push({ fileName: file.originalname, fileUrl: publicUrl });
+      // Private bucket — hand back a short-lived signed URL for the uploader.
+      const { data: signed } = await supabase.storage
+        .from('venview-permits')
+        .createSignedUrl(path, 60 * 60);
+
+      results.push({ fileName: file.originalname, fileUrl: signed?.signedUrl ?? null });
     }
 
     res.json({ success: true, files: results });

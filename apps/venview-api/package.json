@@ -108,6 +108,7 @@
     "multer": "^2.0.0",
     "pdf-parse": "^2.4.5",
     "square": "^44.1.0",
+    "stripe": "^22.2.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

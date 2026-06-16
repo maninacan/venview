@@ -21,6 +21,8 @@ export const typeDefs = `#graphql
     ownerId: ID!
     joinCode: String
     plan: String!
+    subscriptionStatus: String
+    currentPeriodEnd: String
     createdAt: String
     members: [CompanyMember!]!
     squareStatus: SquareStatus
@@ -139,7 +141,8 @@ export const typeDefs = `#graphql
   type Permit {
     id: ID!
     fileName: String!
-    fileUrl: String!
+    "Short-lived signed URL minted on read (files are stored privately)."
+    fileUrl: String
     uploadedAt: String
   }
 

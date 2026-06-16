@@ -380,4 +380,16 @@ export const eventResolvers = {
       return (data ?? []).length;
     },
   },
+
+  Permit: {
+    // Mint a short-lived signed URL on read — permit files live in a private bucket.
+    fileUrl: async (permit: Record<string, unknown>) => {
+      const path = permit['filePath'] as string | null;
+      if (!path) return (permit['fileUrl'] as string | null) ?? null;
+      const { data } = await supabase.storage
+        .from('venview-permits')
+        .createSignedUrl(path, 60 * 60);
+      return data?.signedUrl ?? null;
+    },
+  },
 };

@@ -1,3 +1,5 @@
+import { useNavigate, useParams } from 'react-router-dom';
+
 interface Props {
   context: 'report' | 'finalize' | 'history' | 'pdf' | 'multiday' | string;
   onClose: () => void;
@@ -13,6 +15,13 @@ const CONTEXTS: Record<string, { icon: string; text: string }> = {
 
 export function UpgradeModal({ context, onClose }: Props) {
   const ctx = CONTEXTS[context] ?? { icon: 'fa-solid fa-lock', text: context };
+  const navigate = useNavigate();
+  const { companyId } = useParams<{ companyId: string }>();
+
+  const goToBilling = () => {
+    if (companyId) navigate(`/companies/${companyId}/billing`);
+    onClose();
+  };
 
   const featureCheck = 'w-[19px] h-[19px] rounded-full flex items-center justify-center text-[0.7rem] font-bold flex-shrink-0 mt-0.5';
 
@@ -76,11 +85,11 @@ export function UpgradeModal({ context, onClose }: Props) {
           <button
             className="block w-full py-3 rounded-[10px] text-[0.93rem] font-bold cursor-pointer border-0 font-[inherit] bg-[#0B2A4A] text-white mb-2 hover:bg-[#0A3A67]"
             style={{ transition: 'background 0.15s' }}
-            onClick={onClose}
+            onClick={goToBilling}
           >
             <i className="fa-solid fa-bolt" /> Upgrade to Pro
           </button>
-          <p className="text-[0.76rem] text-[#64748b] mt-[5px] mb-3.5">Contact us to upgrade &nbsp;·&nbsp; No spreadsheets, no guesswork</p>
+          <p className="text-[0.76rem] text-[#64748b] mt-[5px] mb-3.5">Secure checkout powered by Stripe &nbsp;·&nbsp; cancel anytime</p>
           <button
             className="block w-full py-3 rounded-[10px] text-[0.83rem] font-medium cursor-pointer border-0 font-[inherit] bg-transparent text-[#64748b]"
             onClick={onClose}
