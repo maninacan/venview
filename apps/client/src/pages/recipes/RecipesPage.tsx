@@ -263,7 +263,7 @@ export function RecipesPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div>
-            <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>🍋 Recipes</h2>
+            <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>🍋 Recipes{!loading && recipes.length > 0 && <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({recipes.length})</span>}</h2>
             <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.86rem' }}>
               Define ingredient costs for each dish. VenView uses these to calculate COGS automatically when you sync Square sales.
             </p>

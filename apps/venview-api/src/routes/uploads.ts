@@ -50,66 +50,154 @@ Rules:
 - Recipe names should be clean and properly capitalized.
 - Return an empty recipes array if no recipes are found.`;
 
-// ── POST /api/uploads/inventory-csv ──────────────────────────────────────────
-router.post('/uploads/inventory-csv', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    const ctx = await createContext(req);
-    if (!ctx.user) return void res.status(401).json({ error: 'Unauthorized' });
+const INVENTORY_EXTRACT_PROMPT = `You are an inventory/product-catalog data extraction assistant. Extract every product/item from the provided content.
 
-    const companyId = req.body['companyId'] as string;
-    if (!companyId) return void res.status(400).json({ error: 'companyId required' });
+The content may arrive in any format — CSV, spreadsheet text, PDF, plain text, vendor invoice, order guide, price list, or an image/photo of a shelf, invoice, or spreadsheet. Adapt your reading strategy to whatever you receive.
 
-    const file = req.file;
-    if (!file) return void res.status(400).json({ error: 'No file uploaded' });
+STEP 1 — Understand the layout.
+- CSV / spreadsheet text: mentally reconstruct the 2-D grid (each line = a row, each comma-separated value = a cell). Trailing empty cells are padding — ignore them.
+- PDF / plain text / invoice / price list: identify each line item and its associated cost/quantity.
+- Image / photo: identify every distinct product visible.
 
-    // Verify membership
-    const { data: member } = await supabase
-      .from('CompanyMembers')
-      .select('role')
-      .eq('companyId', companyId)
-      .eq('userId', ctx.user.id)
-      .single();
-    if (!member) return void res.status(403).json({ error: 'Forbidden' });
+STEP 2 — Find ALL items.
+An item = a product name plus whatever attributes are available (category, unit cost, quantity on hand, reorder threshold, SKU). Scan the entire content — do not stop after the first item.
 
-    // Parse CSV from buffer
-    const text = file.buffer.toString('utf-8');
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length < 2) return void res.status(400).json({ error: 'CSV must have a header row and at least one data row' });
+STEP 3 — Skip these rows entirely — they are NOT items:
+  • Column-header rows: "Item Name", "Name", "Category", "Cost", "Unit Cost", "Quantity", "On Hand", "Reorder", "SKU", or similar labels
+  • Summary/total rows: any row starting with "Total", "Subtotal", "Grand Total", or similar
+  • Blank rows
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+STEP 4 — Output.
+Return ONLY a raw JSON object — no markdown fences, no explanation, no surrounding text:
+{
+  "items": [
+    { "name": "item name", "category": "Syrups", "unitCost": 3.50, "quantityOnHand": 10, "reorderThreshold": 2, "sku": "SYR-001" }
+  ]
+}
 
-    const rows: Array<Record<string, unknown>> = [];
-    for (let i = 1; i < lines.length; i++) {
-      const vals = parseCSVLine(lines[i]);
-      if (vals.length === 0) continue;
+Rules:
+- Strip currency symbols from costs ("$3.50" → 3.50). If cost is missing or unclear, use 0.
+- If quantityOnHand is missing, use 0. If reorderThreshold is missing, use 0.
+- category, sku may be empty strings if not present.
+- Item names should be clean and properly capitalized.
+- Return an empty items array if no items are found.`;
 
-      const row: Record<string, unknown> = { companyId, updatedAt: new Date().toISOString() };
-      headers.forEach((h, idx) => {
-        const val = vals[idx]?.trim() ?? '';
-        if (h === 'itemname' || h === 'name') row['itemName'] = val;
-        else if (h === 'category') row['category'] = val || null;
-        else if (h === 'unitcost' || h === 'cost') row['unitCost'] = parseFloat(val) || 0;
-        else if (h === 'quantityonhand' || h === 'quantity' || h === 'qty') row['quantityOnHand'] = parseFloat(val) || 0;
-        else if (h === 'reorderthreshold' || h === 'threshold' || h === 'reorder') row['reorderThreshold'] = parseFloat(val) || 0;
-        else if (h === 'sku') row['sku'] = val || null;
-      });
+type ParsedUpload = {
+  isImage: boolean;
+  userContent: string | Anthropic.MessageParam['content'];
+  extractedText: string;
+};
 
-      if (!row['itemName']) continue;
-      rows.push(row);
-    }
+// Turn an uploaded file into content suitable for an Anthropic message:
+// images become an image content block; everything else is parsed to text.
+// Throws if no text could be extracted from a non-image file.
+async function parseUploadToContent(file: Express.Multer.File): Promise<ParsedUpload> {
+  const mime = file.mimetype;
+  const ext = file.originalname.split('.').pop()?.toLowerCase() ?? '';
+  const isImage = mime.startsWith('image/');
 
-    if (rows.length === 0) return void res.status(400).json({ error: 'No valid rows found in CSV' });
+  if (isImage) {
+    const validImageMime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
+    type ValidImageMime = typeof validImageMime[number];
+    const mediaMime: ValidImageMime = validImageMime.includes(mime as ValidImageMime)
+      ? (mime as ValidImageMime)
+      : 'image/jpeg';
 
-    // Upsert by itemName within company
-    const { error } = await supabase.from('VendorInventory').upsert(rows, { onConflict: 'companyId,itemName' });
-    if (error) throw new Error(error.message);
-
-    res.json({ success: true, imported: rows.length });
-  } catch (err) {
-    console.error('CSV upload error:', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Upload failed' });
+    return {
+      isImage: true,
+      extractedText: '',
+      userContent: [{
+        type: 'image' as const,
+        source: { type: 'base64' as const, media_type: mediaMime, data: file.buffer.toString('base64') },
+      }],
+    };
   }
-});
+
+  let text: string;
+  if (mime === 'application/pdf' || ext === 'pdf') {
+    const parsed = await pdfParse(file.buffer);
+    text = parsed.text;
+  } else if (
+    mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mime === 'application/vnd.ms-excel' ||
+    ext === 'xlsx' || ext === 'xls'
+  ) {
+    const wb = XLSX.read(file.buffer);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    text = XLSX.utils.sheet_to_csv(ws);
+  } else {
+    text = file.buffer.toString('utf-8');
+  }
+
+  if (!text.trim()) throw new Error('Could not extract text from file');
+
+  // Strip trailing empty columns from each row (Google Sheets exports ~87 trailing commas)
+  text = text.split('\n').map(row => {
+    const cols = row.split(',');
+    let last = cols.length - 1;
+    while (last >= 0 && !cols[last].trim().replace(/^"|"$/g, '')) last--;
+    return cols.slice(0, last + 1).join(',');
+  }).filter(row => row.trim()).join('\n');
+
+  return { isImage: false, extractedText: text, userContent: text };
+}
+
+type StreamParams = Parameters<Anthropic['messages']['stream']>[0];
+
+const MAX_ANTHROPIC_ATTEMPTS = 4;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Transient Anthropic failures (overload, rate-limit, 5xx) that are safe to
+// retry. Overload errors arrive as an SSE event with status `undefined`, so we
+// also sniff the error payload's type rather than relying on the HTTP status.
+function isTransientAnthropicError(err: unknown): boolean {
+  if (err instanceof Anthropic.APIError) {
+    const status = err.status;
+    if (status === 408 || status === 409 || status === 429) return true;
+    if (typeof status === 'number' && status >= 500) return true;
+  }
+  const e = err as { error?: { error?: { type?: string }; type?: string }; type?: string };
+  const innerType = e?.error?.error?.type ?? e?.error?.type ?? e?.type;
+  return innerType === 'overloaded_error' || innerType === 'api_error';
+}
+
+// Run a streaming message to completion and return its full text, retrying
+// transient failures with exponential backoff.
+async function extractTextWithRetry(anthropic: Anthropic, params: StreamParams): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await anthropic.messages.stream(params).finalText();
+    } catch (err) {
+      if (attempt >= MAX_ANTHROPIC_ATTEMPTS - 1 || !isTransientAnthropicError(err)) throw err;
+      await sleep(Math.min(1000 * 2 ** attempt, 8000));
+    }
+  }
+}
+
+// Stream message text deltas straight to the HTTP response, retrying transient
+// failures ONLY while nothing has been written yet — a half-streamed response
+// can't be safely restarted without duplicating output.
+async function streamTextToResponse(anthropic: Anthropic, params: StreamParams, res: Response): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    let wroteAny = false;
+    try {
+      const stream = anthropic.messages.stream(params);
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          wroteAny = true;
+          res.write(event.delta.text);
+        }
+      }
+      return;
+    } catch (err) {
+      if (wroteAny || attempt >= MAX_ANTHROPIC_ATTEMPTS - 1 || !isTransientAnthropicError(err)) throw err;
+      await sleep(Math.min(1000 * 2 ** attempt, 8000));
+    }
+  }
+}
 
 // ── POST /api/uploads/recipes-ai ─────────────────────────────────────────────
 router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, res: Response) => {
@@ -132,55 +220,14 @@ router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, r
     if (!member) return void res.status(403).json({ error: 'Forbidden' });
 
     const anthropic = new Anthropic();
-    const mime = file.mimetype;
-    const ext = file.originalname.split('.').pop()?.toLowerCase() ?? '';
-    const isImage = mime.startsWith('image/');
 
-    type UserContent = string | Anthropic.MessageParam['content'];
-    let userContent: UserContent;
-    let extractedText = '';
-
-    if (isImage) {
-      const validImageMime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
-      type ValidImageMime = typeof validImageMime[number];
-      const mediaMime: ValidImageMime = validImageMime.includes(mime as ValidImageMime)
-        ? (mime as ValidImageMime)
-        : 'image/jpeg';
-
-      userContent = [{
-        type: 'image' as const,
-        source: { type: 'base64' as const, media_type: mediaMime, data: file.buffer.toString('base64') },
-      }];
-    } else {
-      let text: string;
-
-      if (mime === 'application/pdf' || ext === 'pdf') {
-        const parsed = await pdfParse(file.buffer);
-        text = parsed.text;
-      } else if (
-        mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        mime === 'application/vnd.ms-excel' ||
-        ext === 'xlsx' || ext === 'xls'
-      ) {
-        const wb = XLSX.read(file.buffer);
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        text = XLSX.utils.sheet_to_csv(ws);
-      } else {
-        text = file.buffer.toString('utf-8');
-      }
-
-      if (!text.trim()) return void res.status(400).json({ error: 'Could not extract text from file' });
-
-      // Strip trailing empty columns from each row (Google Sheets exports ~87 trailing commas)
-      text = text.split('\n').map(row => {
-        const cols = row.split(',');
-        let last = cols.length - 1;
-        while (last >= 0 && !cols[last].trim().replace(/^"|"$/g, '')) last--;
-        return cols.slice(0, last + 1).join(',');
-      }).filter(row => row.trim()).join('\n');
-
-      extractedText = text;
-      userContent = text;
+    let isImage: boolean;
+    let userContent: string | Anthropic.MessageParam['content'];
+    let extractedText: string;
+    try {
+      ({ isImage, userContent, extractedText } = await parseUploadToContent(file));
+    } catch (parseErr) {
+      return void res.status(400).json({ error: parseErr instanceof Error ? parseErr.message : 'Could not parse file' });
     }
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -209,13 +256,12 @@ router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, r
       for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
         res.write(`Processing section ${chunkIdx + 1} of ${chunks.length}...\n`);
         try {
-          const chunkStream = anthropic.messages.stream({
+          const rawText = await extractTextWithRetry(anthropic, {
             model: 'claude-opus-4-8',
             max_tokens: 32000,
             system: RECIPE_EXTRACT_PROMPT,
             messages: [{ role: 'user', content: chunks[chunkIdx] }],
           });
-          const rawText = await chunkStream.finalText();
           const cleaned = rawText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
           const jStart = cleaned.indexOf('{');
           const jEnd = cleaned.lastIndexOf('}');
@@ -240,23 +286,123 @@ router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, r
       res.write(`\nDone — ${allRecipes.length} recipes extracted.\n\n`);
       res.write(JSON.stringify({ recipes: allRecipes }));
     } else {
-      const stream = anthropic.messages.stream({
+      await streamTextToResponse(anthropic, {
         model: 'claude-opus-4-8',
         max_tokens: 32000,
         system: RECIPE_EXTRACT_PROMPT,
         messages: [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
-      });
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          res.write(event.delta.text);
-        }
-      }
+      }, res);
     }
 
     res.end();
   } catch (err) {
     console.error('Recipe AI upload error:', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Upload failed' });
+    const message = isTransientAnthropicError(err)
+      ? 'Claude is temporarily overloaded. Please try again in a moment.'
+      : err instanceof Error ? err.message : 'Upload failed';
+    if (!res.headersSent) res.status(500).json({ error: message });
+    else res.end();
+  }
+});
+
+// ── POST /api/uploads/inventory-ai ───────────────────────────────────────────
+router.post('/uploads/inventory-ai', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const ctx = await createContext(req);
+    if (!ctx.user) return void res.status(401).json({ error: 'Unauthorized' });
+
+    const companyId = req.body['companyId'] as string;
+    if (!companyId) return void res.status(400).json({ error: 'companyId required' });
+
+    const file = req.file;
+    if (!file) return void res.status(400).json({ error: 'No file uploaded' });
+
+    const { data: member } = await supabase
+      .from('CompanyMembers')
+      .select('role')
+      .eq('companyId', companyId)
+      .eq('userId', ctx.user.id)
+      .single();
+    if (!member) return void res.status(403).json({ error: 'Forbidden' });
+
+    const anthropic = new Anthropic();
+
+    let isImage: boolean;
+    let userContent: string | Anthropic.MessageParam['content'];
+    let extractedText: string;
+    try {
+      ({ isImage, userContent, extractedText } = await parseUploadToContent(file));
+    } catch (parseErr) {
+      return void res.status(400).json({ error: parseErr instanceof Error ? parseErr.message : 'Could not parse file' });
+    }
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+    const textRows = extractedText.split('\n');
+    const CHUNK_ROWS = 350;
+    const CHUNK_OVERLAP = 30;
+
+    if (!isImage && textRows.length > CHUNK_ROWS) {
+      // Large file: split into overlapping chunks so items at boundaries appear
+      // in both adjacent chunks, then deduplicate by item name.
+      type ItemData = { name: string; category?: string; unitCost?: number; quantityOnHand?: number; reorderThreshold?: number; sku?: string };
+
+      const chunks: string[] = [];
+      for (let i = 0; i < textRows.length; i += CHUNK_ROWS) {
+        const start = i === 0 ? 0 : i - CHUNK_OVERLAP;
+        const end = Math.min(textRows.length, i + CHUNK_ROWS);
+        const chunk = textRows.slice(start, end).join('\n').trim();
+        if (chunk) chunks.push(chunk);
+      }
+
+      // Map keyed by item name; last write wins (later chunk overlap refines)
+      const itemMap = new Map<string, ItemData>();
+
+      for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+        res.write(`Processing section ${chunkIdx + 1} of ${chunks.length}...\n`);
+        try {
+          const rawText = await extractTextWithRetry(anthropic, {
+            model: 'claude-opus-4-8',
+            max_tokens: 32000,
+            system: INVENTORY_EXTRACT_PROMPT,
+            messages: [{ role: 'user', content: chunks[chunkIdx] }],
+          });
+          const cleaned = rawText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+          const jStart = cleaned.indexOf('{');
+          const jEnd = cleaned.lastIndexOf('}');
+          if (jStart >= 0 && jEnd > jStart) {
+            const parsed = JSON.parse(cleaned.slice(jStart, jEnd + 1)) as { items?: ItemData[] };
+            for (const it of parsed.items ?? []) {
+              itemMap.set(it.name.toLowerCase().trim(), it);
+            }
+            res.write(`  Found ${(parsed.items ?? []).length} items.\n`);
+          }
+        } catch (chunkErr) {
+          console.error(`Chunk ${chunkIdx + 1} error:`, chunkErr);
+          res.write(`  Warning: could not fully process section ${chunkIdx + 1}.\n`);
+        }
+      }
+
+      const allItems = Array.from(itemMap.values());
+      res.write(`\nDone — ${allItems.length} items extracted.\n\n`);
+      res.write(JSON.stringify({ items: allItems }));
+    } else {
+      await streamTextToResponse(anthropic, {
+        model: 'claude-opus-4-8',
+        max_tokens: 32000,
+        system: INVENTORY_EXTRACT_PROMPT,
+        messages: [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
+      }, res);
+    }
+
+    res.end();
+  } catch (err) {
+    console.error('Inventory AI upload error:', err);
+    const message = isTransientAnthropicError(err)
+      ? 'Claude is temporarily overloaded. Please try again in a moment.'
+      : err instanceof Error ? err.message : 'Upload failed';
+    if (!res.headersSent) res.status(500).json({ error: message });
+    else res.end();
   }
 });
 
@@ -303,26 +449,5 @@ router.post('/uploads/permit', upload.array('files', 10), async (req: Request, r
     res.status(500).json({ error: err instanceof Error ? err.message : 'Upload failed' });
   }
 });
-
-// Simple CSV line parser that handles quoted fields
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current);
-  return result;
-}
 
 export default router;

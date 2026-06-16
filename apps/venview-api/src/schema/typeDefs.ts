@@ -360,6 +360,15 @@ export const typeDefs = `#graphql
     sku: String
   }
 
+  input CreateInventoryItemInput {
+    name: String!
+    category: String
+    unitCost: Float
+    quantityOnHand: Float
+    reorderThreshold: Float
+    sku: String
+  }
+
   input PosMappingInput {
     posSystem: String!
     posItemId: String!
@@ -568,6 +577,7 @@ export const typeDefs = `#graphql
     deleteRecipe(id: ID!): Boolean!
 
     # Inventory
+    createInventoryItem(companyId: ID!, input: CreateInventoryItemInput!): InventoryItem!
     updateInventoryItem(id: ID!, input: UpdateInventoryItemInput!): InventoryItem!
     deleteInventoryItem(id: ID!): Boolean!
     clearInventory(companyId: ID!): Boolean!
