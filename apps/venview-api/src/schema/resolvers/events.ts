@@ -105,7 +105,7 @@ async function buildEventReport(eventId: string) {
 const EVENT_SCHEMA_FIELDS = new Set([
   'id', 'companyId', 'eventName', 'eventDate', 'endDate', 'status', 'eventType',
   'eventHost', 'eventLocation', 'coordinator', 'notes', 'zipCode', 'squareLocationId',
-  'time', 'applicationDate', 'eventRating', 'customFields', 'numDays',
+  'time', 'applicationDate', 'eventRating', 'permits', 'employees', 'customFields', 'numDays',
   'isFinalized', 'finalizedDate', 'days', 'netProfit',
   // joined sub-objects used for inline computation (stripped below)
   'SalesSummary', 'EventExpenses', 'EventDays',

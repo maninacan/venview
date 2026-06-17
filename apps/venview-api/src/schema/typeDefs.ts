@@ -83,6 +83,8 @@ export const typeDefs = `#graphql
     time: String
     applicationDate: String
     eventRating: String
+    permits: String
+    employees: String
     customFields: JSON
     numDays: Int
     isFinalized: Boolean!
@@ -227,6 +229,8 @@ export const typeDefs = `#graphql
     time: String
     applicationDate: String
     eventRating: String
+    permits: String
+    employees: String
     numDays: Int
     customFields: JSON
     days: [EventDayInput!]
@@ -254,6 +258,8 @@ export const typeDefs = `#graphql
     time: String
     applicationDate: String
     eventRating: String
+    permits: String
+    employees: String
     numDays: Int
     customFields: JSON
     days: [EventDayInput!]
@@ -395,20 +401,6 @@ export const typeDefs = `#graphql
     inventoryId: ID
   }
 
-  # ─── Form Templates ──────────────────────────────────────────────────────────
-  type FormTemplate {
-    id: ID!
-    companyId: ID!
-    templateName: String!
-    fields: JSON!
-    isActive: Boolean!
-  }
-
-  input SaveFormTemplateInput {
-    templateName: String!
-    fields: JSON!
-  }
-
   # ─── Square ──────────────────────────────────────────────────────────────────
   type SquareStatus {
     connected: Boolean!
@@ -535,8 +527,6 @@ export const typeDefs = `#graphql
     posMappings(companyId: ID!): [PosMapping!]!
     eventInventory(eventId: ID!): [EventInventory!]!
 
-    formTemplates(companyId: ID!): [FormTemplate!]!
-
     adminUsers: [AdminUser!]!
     adminDashboard: AdminDashboard!
     companiesInState(state: String!): [CompanyLocation!]!
@@ -613,10 +603,6 @@ export const typeDefs = `#graphql
     # Inventory alerts
     markAlertRead(id: ID!): Boolean!
     markAllAlertsRead(companyId: ID!): Boolean!
-
-    # Form templates
-    saveFormTemplate(companyId: ID!, input: SaveFormTemplateInput!): FormTemplate!
-    activateFormTemplate(companyId: ID!, templateId: ID!): Boolean!
 
     # Super Admin
     updateCompanyPlan(companyId: ID!, plan: String!): Company!

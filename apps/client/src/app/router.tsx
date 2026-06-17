@@ -9,7 +9,6 @@ import { PostEventReportPage } from '../pages/events/PostEventReportPage';
 import { InventoryPage } from '../pages/inventory/InventoryPage';
 import { RecipesPage } from '../pages/recipes/RecipesPage';
 import { RestockPage } from '../pages/restock/RestockPage';
-import { FormBuilderPage } from '../pages/form-builder/FormBuilderPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
 import { BillingPage } from '../pages/billing/BillingPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
@@ -47,7 +46,6 @@ export const router = createBrowserRouter([
       { path: 'inventory', element: <InventoryPage /> },
       { path: 'recipes', element: <RecipesPage /> },
       { path: 'restock', element: <RestockPage /> },
-      { path: 'form-builder', element: <FormBuilderPage /> },
       { path: 'settings', element: <SettingsPage />, errorElement: <ErrorElement /> },
       { path: 'billing', element: <BillingPage />, errorElement: <ErrorElement /> },
     ],

@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
-import { CollapsibleCard } from '../../components/dashboard/CollapsibleCard';
 import { ProfitSummaryCard } from '../../components/dashboard/ProfitSummaryCard';
 import { showToast } from '@org/data';
 
@@ -64,6 +63,7 @@ export function EventDashboardPage() {
   });
 
   const [deleteEvent] = useMutation(DELETE_EVENT);
+  const [activeTab, setActiveTab] = useState(0);
 
   const report = data?.eventReport;
   const event = report?.event;
@@ -117,6 +117,75 @@ export function EventDashboardPage() {
     { label: 'Notes', value: event?.notes },
   ].filter(f => f.value);
 
+  // Event-data tabs (Inventory Sales → Ingredient Costs)
+  const tabs: Array<{ title: string; headerRight?: ReactNode; content: ReactNode }> = [
+    {
+      title: 'Inventory Sales',
+      content: inventorySales.length === 0 ? (
+        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>No Inventory Sales recorded. Pull Square Sales to populate.</p>
+      ) : (
+        <div className="table-container">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+            <thead><tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
+              <th style={{ padding: '6px 8px' }}>Item</th>
+              <th style={{ padding: '6px 8px' }}>Qty Sold</th>
+              <th style={{ padding: '6px 8px' }}>Unit Cost</th>
+              <th style={{ padding: '6px 8px' }}>Total COGS</th>
+            </tr></thead>
+            <tbody>
+              {inventorySales.map((r: Record<string, unknown>, i: number) => (
+                <tr key={i}>
+                  <td style={{ padding: '6px 8px' }}>{r['name'] as string}</td>
+                  <td style={{ padding: '6px 8px' }}>{Number(r['quantitySold'])}</td>
+                  <td style={{ padding: '6px 8px' }}>{r['unitPrice'] != null ? fmt(r['unitPrice'] as number) : '—'}</td>
+                  <td style={{ padding: '6px 8px' }}>{fmt(r['totalCost'] as number)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ),
+    },
+    {
+      title: 'Truck Inventory',
+      content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Truck inventory tracking coming in Phase 5.</p>,
+    },
+    {
+      title: 'Manual Sales Entry',
+      content: <ManualSalesForm eventId={eventId!} sales={sales} onSaved={refetch} />,
+    },
+    {
+      title: 'Discounts',
+      content: <AdjustmentForm eventId={eventId!} field="discounts" label="Discounts" currentValue={Number(sales.discounts ?? 0)} onSaved={refetch} />,
+    },
+    {
+      title: 'Labor',
+      headerRight: (
+        <button className="btn-secondary" onClick={() => showToast('Square labor sync coming in Phase 4', 'info')} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
+          Pull Square Labor
+        </button>
+      ),
+      content: <LaborSection eventId={eventId!} companyId={companyId!} laborEntries={laborEntries} onSaved={refetch} />,
+    },
+    {
+      title: 'Additional Fees',
+      content: <AdditionalFeesSection eventId={eventId!} fees={[]} onSaved={refetch} />,
+    },
+    {
+      title: 'Expenses',
+      content: <ExpensesForm eventId={eventId!} expenses={expenses} onSaved={refetch} />,
+    },
+    {
+      title: 'Tips',
+      content: <AdjustmentForm eventId={eventId!} field="tips" label="Tips (pass-through)" currentValue={Number(sales.tips ?? 0)} onSaved={refetch} />,
+    },
+    {
+      title: 'Ingredient Costs (Recipe Matching)',
+      content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Recipe matching coming in Phase 5. Connect recipes to auto-calculate COGS.</p>,
+    },
+  ];
+  const active = tabs[Math.min(activeTab, tabs.length - 1)];
+
   return (
     <>
       {/* Dashboard header */}
@@ -156,83 +225,29 @@ export function EventDashboardPage() {
         </div>
       </div>
 
-      {/* ── Dashboard Cards (matches original workflow order) ── */}
+      {/* ── Event data tabs (Inventory Sales → Ingredient Costs) ── */}
+      <div className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] overflow-hidden mb-2.5 shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
+        <div className="flex bg-[#f8fafc] border-b border-[rgba(11,42,74,0.12)]" role="tablist">
+          {tabs.map((t, i) => (
+            <button
+              key={t.title}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === i}
+              onClick={() => setActiveTab(i)}
+              className={`flex-1 min-w-0 px-2 py-2.5 text-[0.85rem] font-semibold break-words text-center border-0 bg-transparent cursor-pointer border-b-2 transition-colors ${activeTab === i ? 'text-[#0B2A4A] border-[#0B2A4A]' : 'text-[#64748b] border-transparent hover:text-[#0B2A4A]'}`}
+            >
+              {t.title}
+            </button>
+          ))}
+        </div>
+        <div className="px-[18px] pt-3.5 pb-[18px]">
+          {active.headerRight && <div className="flex justify-end mb-3">{active.headerRight}</div>}
+          {active.content}
+        </div>
+      </div>
 
-      {/* 1. Inventory Sales */}
-      <CollapsibleCard title="Inventory Sales">
-        {inventorySales.length === 0 ? (
-          <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>No Inventory Sales recorded. Pull Square Sales to populate.</p>
-        ) : (
-          <div className="table-container">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
-              <thead><tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-                <th style={{ padding: '6px 8px' }}>Item</th>
-                <th style={{ padding: '6px 8px' }}>Qty Sold</th>
-                <th style={{ padding: '6px 8px' }}>Unit Cost</th>
-                <th style={{ padding: '6px 8px' }}>Total COGS</th>
-              </tr></thead>
-              <tbody>
-                {inventorySales.map((r: Record<string, unknown>, i: number) => (
-                  <tr key={i}>
-                    <td style={{ padding: '6px 8px' }}>{r['name'] as string}</td>
-                    <td style={{ padding: '6px 8px' }}>{Number(r['quantitySold'])}</td>
-                    <td style={{ padding: '6px 8px' }}>{r['unitPrice'] != null ? fmt(r['unitPrice'] as number) : '—'}</td>
-                    <td style={{ padding: '6px 8px' }}>{fmt(r['totalCost'] as number)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CollapsibleCard>
-
-      {/* 2. Truck Inventory */}
-      <CollapsibleCard title="Truck Inventory">
-        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Truck inventory tracking coming in Phase 5.</p>
-      </CollapsibleCard>
-
-      {/* 3. Manual Sales Entry */}
-      <CollapsibleCard title="Manual Sales Entry">
-        <ManualSalesForm eventId={eventId!} sales={sales} onSaved={refetch} />
-      </CollapsibleCard>
-
-      {/* 4. Discounts */}
-      <CollapsibleCard title="Discounts">
-        <AdjustmentForm eventId={eventId!} field="discounts" label="Discounts" currentValue={Number(sales.discounts ?? 0)} onSaved={refetch} />
-      </CollapsibleCard>
-
-      {/* 5. Labor */}
-      <CollapsibleCard title="Labor" headerRight={
-        <button className="btn-secondary ml-auto" onClick={() => showToast('Square labor sync coming in Phase 4', 'info')} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
-          Pull Square Labor
-        </button>
-      }>
-        <LaborSection eventId={eventId!} companyId={companyId!} laborEntries={laborEntries} onSaved={refetch} />
-      </CollapsibleCard>
-
-      {/* 6. Additional Fees */}
-      <CollapsibleCard title="Additional Fees">
-        <AdditionalFeesSection eventId={eventId!} fees={[]} onSaved={refetch} />
-      </CollapsibleCard>
-
-      {/* 7. Expenses */}
-      <CollapsibleCard title="Expenses">
-        <ExpensesForm eventId={eventId!} expenses={expenses} onSaved={refetch} />
-      </CollapsibleCard>
-
-      {/* 8. Tips */}
-      <CollapsibleCard title="Tips">
-        <AdjustmentForm eventId={eventId!} field="tips" label="Tips (pass-through)" currentValue={Number(sales.tips ?? 0)} onSaved={refetch} />
-      </CollapsibleCard>
-
-      {/* 9. Ingredient Costs / Recipe Matching */}
-      <CollapsibleCard title="Ingredient Costs (Recipe Matching)">
-        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Recipe matching coming in Phase 5. Connect recipes to auto-calculate COGS.</p>
-      </CollapsibleCard>
-
-      {/* 10. Custom Fields (if any) */}
-
-      {/* 11. Event Profit Summary — open by default */}
+      {/* Event Profit Summary — open by default */}
       <ProfitSummaryCard
         eventId={eventId!}
         isFinalized={Boolean(event?.isFinalized)}

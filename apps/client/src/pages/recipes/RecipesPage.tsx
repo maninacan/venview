@@ -236,23 +236,32 @@ export function RecipesPage() {
 
   async function handleApproveAll() {
     setApprovingAll(true);
-    let saved = 0;
+    const inputs = importedRecipes.map(recipe => ({
+      name: recipe.name.trim(),
+      ingredients: recipe.ingredients
+        .filter(i => i.name.trim())
+        .map(({ id: _id, ...i }) => ({ ...i, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })),
+    }));
+    let saved = 0, failed = 0;
     try {
-      for (const recipe of importedRecipes) {
-        const input = {
-          name: recipe.name.trim(),
-          ingredients: recipe.ingredients
-            .filter(i => i.name.trim())
-            .map(({ id: _id, ...i }) => ({ ...i, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })),
-        };
-        await createRecipe({ variables: { companyId, input } });
-        saved++;
-      }
-      showToast(`Saved ${saved} recipe${saved !== 1 ? 's' : ''}!`, 'success', 5000);
+      // Save concurrently (capped) instead of one round-trip at a time.
+      const CONCURRENCY = 5;
+      const queue = [...inputs];
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+        let input: typeof inputs[number] | undefined;
+        while ((input = queue.shift()) !== undefined) {
+          try { await createRecipe({ variables: { companyId, input } }); saved++; }
+          catch { failed++; }
+        }
+      }));
+
       refetch();
-      closeImportModal();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to save recipes', 'error');
+      if (failed === 0) {
+        showToast(`Saved ${saved} recipe${saved !== 1 ? 's' : ''}!`, 'success', 5000);
+        closeImportModal();
+      } else {
+        showToast(`Saved ${saved}, but ${failed} failed. Please retry the rest.`, 'warning', 6000);
+      }
     } finally { setApprovingAll(false); }
   }
 
