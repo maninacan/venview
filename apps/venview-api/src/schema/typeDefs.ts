@@ -29,6 +29,8 @@ export const typeDefs = `#graphql
     "User id with a pending ownership offer, if any."
     pendingOwnerId: ID
     squareStatus: SquareStatus
+    "True when a TaxJar API token is stored for this company (the token itself is never exposed)."
+    taxjarConnected: Boolean
   }
 
   type AccessRequestResult {
@@ -112,6 +114,10 @@ export const typeDefs = `#graphql
     squareFees: Float
     posFees: Float
     taxRate: Float
+    stateTaxRate: Float
+    localTaxRate: Float
+    taxCollected: Float
+    taxJurisdiction: JSON
     taxOverride: Boolean
     totalCollected: Float
   }
@@ -165,6 +171,12 @@ export const typeDefs = `#graphql
 
   type TaxInfo {
     stateRate: Float
+    localRate: Float
+    combinedRate: Float
+    stateTax: Float
+    localTax: Float
+    taxCollected: Float
+    jurisdiction: JSON
     stateFoodTax: Float
     taxDetail: JSON
   }
@@ -541,6 +553,8 @@ export const typeDefs = `#graphql
     requestAccess(joinCode: String!): AccessRequestResult!
     approveMember(companyId: ID!, userId: ID!): Boolean!
     inviteMember(companyId: ID!, email: String!): InviteResult!
+    setTaxjarToken(companyId: ID!, token: String!): Boolean!
+    removeTaxjarToken(companyId: ID!): Boolean!
     leaveCompany(companyId: ID!): Boolean!
     offerOwnership(companyId: ID!, newOwnerId: ID!): Boolean!
     acceptOwnership(companyId: ID!): Boolean!
@@ -557,7 +571,8 @@ export const typeDefs = `#graphql
     # Sales
     syncSquareSales(eventId: ID!): SyncResult!
     updateManualSales(eventId: ID!, input: ManualSalesInput!): SalesSummary!
-    updateTaxOverride(eventId: ID!, taxRate: Float!): SalesSummary!
+    setEventTaxRates(eventId: ID!, stateTaxRate: Float!, localTaxRate: Float!): SalesSummary!
+    refreshEventTaxRates(eventId: ID!): SalesSummary!
     updateAdjustments(eventId: ID!, tips: Float, posFee: Float): Boolean!
 
     # Expenses

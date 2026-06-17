@@ -9,7 +9,7 @@ import { PosMappingModal } from '../../components/modals/PosMappingModal';
 const GET_SETTINGS = gql`
   query GetSettings($companyId: ID!) {
     company(id: $companyId) {
-      id name phone contactName vendorCategory email joinCode plan pendingOwnerId
+      id name phone contactName vendorCategory email joinCode plan pendingOwnerId taxjarConnected
       members { userId email role }
       pendingRequests { userId email role }
       squareStatus { connected locationName locationId }
@@ -44,6 +44,16 @@ const APPROVE_MEMBER = gql`
 const INVITE_MEMBER = gql`
   mutation InviteMember($companyId: ID!, $email: String!) {
     inviteMember(companyId: $companyId, email: $email) { email status }
+  }
+`;
+const SET_TAXJAR = gql`
+  mutation SetTaxjarToken($companyId: ID!, $token: String!) {
+    setTaxjarToken(companyId: $companyId, token: $token)
+  }
+`;
+const REMOVE_TAXJAR = gql`
+  mutation RemoveTaxjarToken($companyId: ID!) {
+    removeTaxjarToken(companyId: $companyId)
   }
 `;
 const OFFER_OWNERSHIP = gql`
@@ -83,6 +93,8 @@ export function SettingsPage() {
   const [acceptOwnership] = useMutation(ACCEPT_OWNERSHIP);
   const [declineOwnership] = useMutation(DECLINE_OWNERSHIP);
   const [deleteCompany] = useMutation(DELETE_COMPANY);
+  const [setTaxjarToken] = useMutation(SET_TAXJAR);
+  const [removeTaxjarToken] = useMutation(REMOVE_TAXJAR);
   const { user } = useAuth();
 
   const { data, loading, refetch } = useQuery(GET_SETTINGS, {
@@ -100,6 +112,8 @@ export function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteCooldown, setInviteCooldown] = useState(0);
   const [transferTo, setTransferTo] = useState('');
+  const [taxjarInput, setTaxjarInput] = useState('');
+  const [savingTaxjar, setSavingTaxjar] = useState(false);
 
   const info = data?.company;
   const squareStatus = info?.squareStatus;
@@ -171,6 +185,30 @@ export function SettingsPage() {
       });
       if (!res.ok) throw new Error('Disconnect failed');
       showToast('Square disconnected.', 'info');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to disconnect', 'error');
+    }
+  }
+
+  async function handleSaveTaxjar() {
+    if (!taxjarInput.trim()) return;
+    setSavingTaxjar(true);
+    try {
+      await setTaxjarToken({ variables: { companyId, token: taxjarInput.trim() } });
+      showToast('TaxJar connected.', 'success');
+      setTaxjarInput('');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save token', 'error');
+    } finally { setSavingTaxjar(false); }
+  }
+
+  async function handleRemoveTaxjar() {
+    if (!confirm('Disconnect TaxJar? Tax rates will no longer auto-look-up.')) return;
+    try {
+      await removeTaxjarToken({ variables: { companyId } });
+      showToast('TaxJar disconnected.', 'info');
       refetch();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to disconnect', 'error');
@@ -396,6 +434,54 @@ export function SettingsPage() {
               </button>
               <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
                 Connect your Square account to automatically sync sales, locations, and labor.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* TaxJar */}
+        <div className="border border-[rgba(11,42,74,0.12)] rounded-[10px] p-4 mt-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[#16a34a] rounded-md flex items-center justify-center flex-shrink-0 text-white">
+              <i className="fa-solid fa-percent" />
+            </div>
+            <div>
+              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">TaxJar</h3>
+              <p className="m-0 text-[0.8rem] text-[#64748b]">Auto-look-up state &amp; local sales tax rates by ZIP</p>
+            </div>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${info?.taxjarConnected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
+              {info?.taxjarConnected ? '✓ Connected' : 'Not Connected'}
+            </span>
+          </div>
+
+          {!isOwner ? (
+            <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '12px 0 0' }}>
+              Only the company owner can manage the TaxJar connection.
+            </p>
+          ) : info?.taxjarConnected ? (
+            <div style={{ marginTop: 14 }}>
+              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleRemoveTaxjar}>
+                Disconnect TaxJar
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 240 }}>
+                <label style={{ fontSize: '0.8rem' }}>TaxJar API token</label>
+                <input
+                  type="password"
+                  value={taxjarInput}
+                  onChange={e => setTaxjarInput(e.target.value)}
+                  placeholder="Paste your TaxJar API token"
+                  autoComplete="off"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleSaveTaxjar} disabled={savingTaxjar || !taxjarInput.trim()}>
+                {savingTaxjar && <span className="spinner" />} <span>Connect</span>
+              </button>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '4px 0 0', width: '100%' }}>
+                Get a token at <span style={{ fontWeight: 600 }}>app.taxjar.com → Account → API Access</span>. Stored encrypted; never shown again.
               </p>
             </div>
           )}

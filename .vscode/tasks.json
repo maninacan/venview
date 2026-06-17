@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "Start: All Apps",
-      "dependsOn": ["Start: Client", "Start: API", "Start: Marketing", "Start: Super Admin"],
+      "dependsOn": ["Start: Client", "Start: API", "Start: Marketing", "Start: Super Admin", "Start: Stripe Webhook"],
       "dependsOrder": "parallel",
       "group": {
         "kind": "build",
@@ -80,6 +80,24 @@
           "activeOnStart": true,
           "beginsPattern": "VITE",
           "endsPattern": "Local:"
+        }
+      }
+    },
+    {
+      "label": "Start: Stripe Webhook",
+      "type": "npm",
+      "script": "start:stripe",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "stripe",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "(Checking for new versions|Getting ready|stripe)",
+          "endsPattern": "(Ready|Waiting for events)"
         }
       }
     }

@@ -38,9 +38,27 @@ export function useBilling() {
     }
   }
 
+  // Reconcile plan from Stripe (no redirect). Returns true if it succeeded.
+  async function refresh(companyId: string): Promise<boolean> {
+    try {
+      const { supabase } = await import('@org/data');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const res = await fetch(`${API_URL}/api/billing/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ companyId }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
   return {
     busy,
     startCheckout: (companyId: string) => run('checkout', companyId, 'Failed to start checkout'),
     openPortal: (companyId: string) => run('portal', companyId, 'Failed to open billing portal'),
+    refresh,
   };
 }

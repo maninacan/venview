@@ -2,8 +2,52 @@ import type { AppContext } from '../../context/index.js';
 import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
 import { getSquareClient } from '../../lib/square.js';
+import { decryptToken } from '../../lib/crypto.js';
+import { lookupTaxRates } from '../../lib/taxRates.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Upsert a partial SalesSummary patch by eventID (insert the row if missing).
+async function upsertSales(eventId: string, patch: Record<string, unknown>): Promise<void> {
+  const { data: existing } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
+  const stamped = { ...patch, updatedAt: new Date().toISOString() };
+  if (existing) {
+    await supabase.from('SalesSummary').update(stamped).eq('eventID', eventId);
+  } else {
+    await supabase.from('SalesSummary').insert({ eventID: eventId, ...stamped });
+  }
+}
+
+// Look up state + local rates from the event's ZIP and store them — unless the
+// rate was manually overridden. Best-effort: no-ops when there's no ZIP, no API
+// token, or the lookup fails (rates stay at their current values / 0).
+export async function applyTaxRates(eventId: string): Promise<void> {
+  const { data: ev } = await supabase.from('EventInfo').select('zipCode, companyId').eq('eventID', eventId).single();
+  const evRow = ev as Record<string, unknown> | null;
+  const zip = evRow?.['zipCode'] as string | null;
+  const companyId = evRow?.['companyId'] as string | null;
+  if (!zip || !companyId) return;
+
+  const { data: s } = await supabase.from('SalesSummary').select('taxOverride').eq('eventID', eventId).single();
+  if ((s as Record<string, unknown> | null)?.['taxOverride']) return;
+
+  // Use the company's own (encrypted) TaxJar token.
+  const { data: company } = await supabase.from('Companies').select('taxjarToken').eq('id', companyId).single();
+  const enc = (company as Record<string, unknown> | null)?.['taxjarToken'] as string | null;
+  if (!enc) return;
+  let token: string;
+  try { token = decryptToken(enc); } catch { return; }
+
+  const rates = await lookupTaxRates(zip, token);
+  if (!rates) return;
+
+  await upsertSales(eventId, {
+    stateTaxRate: rates.stateRate,
+    localTaxRate: rates.localRate,
+    taxRate: rates.combinedRate,
+    taxJurisdiction: rates.jurisdiction,
+  });
+}
 
 async function getEventWithCompany(eventId: string) {
   const { data } = await supabase
@@ -63,31 +107,38 @@ export const salesResolvers = {
       const totalCollected = Number(input['totalCollected'] ?? 0);
       const netSales = grossSales - refunds - discounts;
 
-      const upsertData = { eventID: eventId, grossSales, netSales, refunds, discounts, totalCollected, updatedAt: new Date().toISOString() };
+      await upsertSales(eventId, { grossSales, netSales, refunds, discounts, totalCollected });
+      // Best-effort: ensure state/local rates are populated from the ZIP.
+      await applyTaxRates(eventId);
 
-      const { data: existing } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
-      const { data, error } = existing
-        ? await supabase.from('SalesSummary').update(upsertData).eq('eventID', eventId).select().single()
-        : await supabase.from('SalesSummary').insert(upsertData).select().single();
-
-      if (error) throw new Error(error.message);
+      const { data } = await supabase.from('SalesSummary').select('*').eq('eventID', eventId).single();
       return data;
     },
 
-    updateTaxOverride: async (
+    // Manually set the state + local rates (flags an override so auto-lookup
+    // won't clobber them).
+    setEventTaxRates: async (
       _: unknown,
-      { eventId, taxRate }: { eventId: string; taxRate: number },
+      { eventId, stateTaxRate, localTaxRate }: { eventId: string; stateTaxRate: number; localTaxRate: number },
       ctx: AppContext
     ) => {
       await assertEventAccess(eventId, ctx);
+      await upsertSales(eventId, {
+        stateTaxRate,
+        localTaxRate,
+        taxRate: +(stateTaxRate + localTaxRate).toFixed(6),
+        taxOverride: true,
+      });
+      const { data } = await supabase.from('SalesSummary').select('*').eq('eventID', eventId).single();
+      return data;
+    },
 
-      const { data: existing } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
-      const update = { eventID: eventId, taxRate, taxOverride: true, updatedAt: new Date().toISOString() };
-      const { data, error } = existing
-        ? await supabase.from('SalesSummary').update({ taxRate, taxOverride: true }).eq('eventID', eventId).select().single()
-        : await supabase.from('SalesSummary').insert(update).select().single();
-
-      if (error) throw new Error(error.message);
+    // Clear the override and re-look-up rates from the event's ZIP.
+    refreshEventTaxRates: async (_: unknown, { eventId }: { eventId: string }, ctx: AppContext) => {
+      await assertEventAccess(eventId, ctx);
+      await upsertSales(eventId, { taxOverride: false });
+      await applyTaxRates(eventId);
+      const { data } = await supabase.from('SalesSummary').select('*').eq('eventID', eventId).single();
       return data;
     },
 
@@ -131,7 +182,7 @@ export const salesResolvers = {
       }
 
       // ── Aggregate totals from orders ────────────────────────────────────────
-      let grossSales = 0, discounts = 0, tips = 0;
+      let grossSales = 0, discounts = 0, tips = 0, taxCollected = 0;
       const itemMap = new Map<string, { name: string; qty: number }>();
 
       for (const order of allOrders) {
@@ -143,6 +194,7 @@ export const salesResolvers = {
         grossSales += (Number(totalMoney?.amount ?? 0) - Number(taxMoney?.amount ?? 0) - Number(tipMoney?.amount ?? 0)) / 100;
         discounts += Number(discountMoney?.amount ?? 0) / 100;
         tips += Number(tipMoney?.amount ?? 0) / 100;
+        taxCollected += Number(taxMoney?.amount ?? 0) / 100; // actual tax Square collected
 
         for (const item of (order['lineItems'] as Array<Record<string, unknown>> | null) ?? []) {
           const name = (item['name'] as string ?? '').trim();
@@ -184,13 +236,16 @@ export const salesResolvers = {
       }
 
       // ── Upsert SalesSummary ─────────────────────────────────────────────────
-      const salesData = { eventID: eventId, grossSales: +grossSales.toFixed(2), netSales: +netSales.toFixed(2), discounts: +discounts.toFixed(2), refunds: +refunds.toFixed(2), tips: +tips.toFixed(2), squareFees: +squareFees.toFixed(2), totalCollected: +totalCollected.toFixed(2), updatedAt: new Date().toISOString() };
+      const salesData = { eventID: eventId, grossSales: +grossSales.toFixed(2), netSales: +netSales.toFixed(2), discounts: +discounts.toFixed(2), refunds: +refunds.toFixed(2), tips: +tips.toFixed(2), squareFees: +squareFees.toFixed(2), totalCollected: +totalCollected.toFixed(2), taxCollected: +taxCollected.toFixed(2), updatedAt: new Date().toISOString() };
       const { data: existingSales } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
       if (existingSales) {
         await supabase.from('SalesSummary').update(salesData).eq('eventID', eventId);
       } else {
         await supabase.from('SalesSummary').insert(salesData);
       }
+
+      // Ensure state/local rates are populated for the breakdown (best-effort).
+      await applyTaxRates(eventId);
 
       // ── Replace InventorySales ──────────────────────────────────────────────
       await supabase.from('InventorySales').delete().eq('eventID', eventId);

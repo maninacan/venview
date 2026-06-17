@@ -32,7 +32,7 @@ const PRO_FEATURES: Array<{ title: string; detail: string }> = [
 
 export function BillingPage() {
   const { companyId } = useCurrentCompany();
-  const { busy, startCheckout, openPortal } = useBilling();
+  const { busy, startCheckout, openPortal, refresh } = useBilling();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data, loading, refetch } = useQuery(GET_BILLING, {
@@ -48,14 +48,15 @@ export function BillingPage() {
     if (!billing) return;
     if (billing === 'success') {
       showToast('Payment received — activating Venview Pro…', 'success', 5000);
-      // The webhook may land a moment after redirect; refetch shortly after.
-      setTimeout(() => refetch(), 1500);
+      // Self-heal: reconcile from Stripe in case the webhook was missed, then refetch.
+      if (companyId) refresh(companyId).finally(() => refetch());
+      else setTimeout(() => refetch(), 1500);
     } else if (billing === 'cancelled') {
       showToast('Checkout cancelled.', 'info');
     }
     searchParams.delete('billing');
     setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, refetch]);
+  }, [searchParams, setSearchParams, refetch, companyId, refresh]);
 
   const renewalDate = company?.currentPeriodEnd
     ? new Date(company.currentPeriodEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })

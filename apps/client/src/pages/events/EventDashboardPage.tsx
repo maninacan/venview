@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { ProfitSummaryCard } from '../../components/dashboard/ProfitSummaryCard';
+import { EventStageStepper } from '../../components/guidance/EventStageStepper';
+import { NextStepBanner } from '../../components/guidance/NextStepBanner';
+import { deriveEventStage, PHASE_LABELS } from '../../lib/eventStage';
 import { showToast } from '@org/data';
 
 const GET_REPORT = gql`
@@ -16,13 +19,13 @@ const GET_REPORT = gql`
       }
       sales {
         grossSales netSales discounts refunds squareFees tips
-        taxRate taxOverride totalCollected
+        taxRate stateTaxRate localTaxRate taxOverride totalCollected
       }
       expenses {
         healthDeptFee eventFee mileage mileageRate coordinatorFee
         posFee employeeBonus eventRunnerFees laborFees additionalFees
       }
-      taxes { stateRate stateFoodTax taxDetail }
+      taxes { stateRate localRate combinedRate stateTax localTax taxCollected jurisdiction }
       summary {
         posFees cogs grossProfit totalExpenses netProfit
         tips stateFoodTax laborFees additionalFeesTotal mileageReimbursement
@@ -54,7 +57,7 @@ function formatDateRange(start: string | null | undefined, numDays: number | nul
 
 export function EventDashboardPage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const { companyId } = useCurrentCompany();
+  const { companyId, company } = useCurrentCompany();
   const navigate = useNavigate();
 
   const { data, loading, error, refetch } = useQuery(GET_REPORT, {
@@ -64,6 +67,8 @@ export function EventDashboardPage() {
 
   const [deleteEvent] = useMutation(DELETE_EVENT);
   const [activeTab, setActiveTab] = useState(0);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const finalizeRef = useRef<HTMLDivElement>(null);
 
   const report = data?.eventReport;
   const event = report?.event;
@@ -180,11 +185,41 @@ export function EventDashboardPage() {
       content: <AdjustmentForm eventId={eventId!} field="tips" label="Tips (pass-through)" currentValue={Number(sales.tips ?? 0)} onSaved={refetch} />,
     },
     {
+      title: 'Sales Tax',
+      content: <TaxSection eventId={eventId!} hasSquare={!!event?.squareLocationId} taxes={taxes} onSaved={refetch} />,
+    },
+    {
       title: 'Ingredient Costs (Recipe Matching)',
       content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Recipe matching coming in Phase 5. Connect recipes to auto-calculate COGS.</p>,
     },
   ];
   const active = tabs[Math.min(activeTab, tabs.length - 1)];
+
+  // Lifecycle stage + the single recommended next action for this event.
+  const stage = deriveEventStage({
+    isFinalized: event?.isFinalized,
+    squareLocationId: event?.squareLocationId,
+    sales,
+    squareConnected: !!company?.squareStatus?.connected,
+  });
+
+  function goToNextStep() {
+    switch (stage.nextStep.action) {
+      case 'review-finalize': finalizeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
+      case 'enter-sales': setActiveTab(2); tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
+      case 'add-costs': setActiveTab(4); tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
+      default: setActiveTab(0); tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; // pull-sales
+    }
+  }
+
+  // Pull-sales buttons for each connected integration. Only show a source when
+  // its company-level connection exists; add future POS integrations here.
+  const salesSourceButtons: ReactNode[] = [];
+  if (company?.squareStatus?.connected) {
+    salesSourceButtons.push(
+      <SyncSquareSalesButton key="square" eventId={eventId!} squareLocationId={event?.squareLocationId} onSynced={refetch} />
+    );
+  }
 
   return (
     <>
@@ -215,7 +250,7 @@ export function EventDashboardPage() {
         {/* Action buttons */}
         <div className="flex flex-col gap-[7px] mb-[18px] mt-3.5">
           <div className="flex flex-wrap gap-2 items-center">
-            <SyncSquareSalesButton eventId={eventId!} squareLocationId={event?.squareLocationId} onSynced={refetch} />
+            {salesSourceButtons}
             <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary"><i className="fa-solid fa-pen-to-square" /> Edit Event</Link>
             <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary"><i className="fa-solid fa-chart-bar" /> Post-Event Report</Link>
           </div>
@@ -225,8 +260,28 @@ export function EventDashboardPage() {
         </div>
       </div>
 
-      {/* ── Event data tabs (Inventory Sales → Ingredient Costs) ── */}
-      <div className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] overflow-hidden mb-2.5 shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
+      {/* ── Lifecycle stepper + next-step ── */}
+      <EventStageStepper stage={stage} />
+      {stage.phase === 'done' ? (
+        <NextStepBanner
+          eyebrow="Finalized"
+          title="This event is finalized"
+          description="View or download the full profit report."
+          ctaLabel="View report"
+          to={`/companies/${companyId}/events/${eventId}/report`}
+        />
+      ) : (
+        <NextStepBanner
+          eyebrow={PHASE_LABELS[stage.phase]}
+          title={stage.nextStep.label}
+          description={stage.phase === 'finalize' ? 'Sales are in — review the numbers and lock the event.' : 'Capture this event’s sales, then add labor and expenses.'}
+          ctaLabel={stage.nextStep.label}
+          onClick={goToNextStep}
+        />
+      )}
+
+      {/* ── Reconcile: event data tabs (Inventory Sales → Ingredient Costs) ── */}
+      <div ref={tabsRef} className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] overflow-hidden mb-2.5 shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
         <div className="flex bg-[#f8fafc] border-b border-[rgba(11,42,74,0.12)]" role="tablist">
           {tabs.map((t, i) => (
             <button
@@ -247,16 +302,18 @@ export function EventDashboardPage() {
         </div>
       </div>
 
-      {/* Event Profit Summary — open by default */}
-      <ProfitSummaryCard
-        eventId={eventId!}
-        isFinalized={Boolean(event?.isFinalized)}
-        sales={sales}
-        expenses={expenses}
-        summary={summary}
-        taxes={taxes}
-        onFinalized={refetch}
-      />
+      {/* Finalize: Event Profit Summary */}
+      <div ref={finalizeRef}>
+        <ProfitSummaryCard
+          eventId={eventId!}
+          isFinalized={Boolean(event?.isFinalized)}
+          sales={sales}
+          expenses={expenses}
+          summary={summary}
+          taxes={taxes}
+          onFinalized={refetch}
+        />
+      </div>
     </>
   );
 }
@@ -294,6 +351,95 @@ function SyncSquareSalesButton({ eventId, squareLocationId, onSynced }: { eventI
       {syncing && <span className="spinner" />}
       <span><i className="fa-solid fa-arrows-rotate" /> Pull Square Sales</span>
     </button>
+  );
+}
+
+// ── Sales Tax section ─────────────────────────────────────────────────────────
+function TaxSection({ eventId, hasSquare, taxes, onSaved }: {
+  eventId: string;
+  hasSquare: boolean;
+  taxes: Record<string, unknown>;
+  onSaved: () => void;
+}) {
+  const SET_RATES = gql`
+    mutation SetEventTaxRates($eventId: ID!, $stateTaxRate: Float!, $localTaxRate: Float!) {
+      setEventTaxRates(eventId: $eventId, stateTaxRate: $stateTaxRate, localTaxRate: $localTaxRate) { taxRate }
+    }
+  `;
+  const REFRESH_RATES = gql`
+    mutation RefreshEventTaxRates($eventId: ID!) {
+      refreshEventTaxRates(eventId: $eventId) { taxRate }
+    }
+  `;
+  const [setRates] = useMutation(SET_RATES);
+  const [refreshRates] = useMutation(REFRESH_RATES);
+
+  const statePctInit = (Number(taxes?.['stateRate'] ?? 0) * 100).toString();
+  const localPctInit = (Number(taxes?.['localRate'] ?? 0) * 100).toString();
+  const [statePct, setStatePct] = useState(statePctInit);
+  const [localPct, setLocalPct] = useState(localPctInit);
+  const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const j = (taxes?.['jurisdiction'] as { state?: string; county?: string; city?: string } | null) ?? {};
+  const stateName = j.state || 'State';
+  const localName = j.city || j.county || 'Local';
+  const stateTax = Number(taxes?.['stateTax'] ?? 0);
+  const localTax = Number(taxes?.['localTax'] ?? 0);
+  const taxCollected = Number(taxes?.['taxCollected'] ?? 0);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await setRates({ variables: { eventId, stateTaxRate: (parseFloat(statePct) || 0) / 100, localTaxRate: (parseFloat(localPct) || 0) / 100 } });
+      showToast('Tax rates saved', 'success');
+      onSaved();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to save rates', 'error'); }
+    finally { setSaving(false); }
+  }
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await refreshRates({ variables: { eventId } });
+      showToast('Rates refreshed from ZIP', 'success');
+      onSaved();
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to refresh', 'error'); }
+    finally { setRefreshing(false); }
+  }
+
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9', fontSize: '0.88rem' };
+
+  return (
+    <div>
+      <p style={{ color: 'var(--muted)', fontSize: '0.82rem', margin: '0 0 12px' }}>
+        Sales tax is a pass-through you remit to the taxing authorities — it's tracked here for your records and never counted as profit.
+        {hasSquare ? ' Amounts come from your actual Square sales.' : ' Amounts are estimated from the rates below.'}
+      </p>
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={rowStyle}><span>Remit to {stateName} — State ({(Number(taxes?.['stateRate'] ?? 0) * 100).toFixed(2)}%)</span><strong>{fmt(stateTax)}</strong></div>
+        <div style={rowStyle}><span>{localName} — Local ({(Number(taxes?.['localRate'] ?? 0) * 100).toFixed(2)}%)</span><strong>{fmt(localTax)}</strong></div>
+        <div style={{ ...rowStyle, borderBottom: 'none', fontWeight: 700, color: 'var(--vv-navy)' }}><span>Total tax collected</span><strong>{fmt(taxCollected)}</strong></div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <div className="form-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: '0.8rem' }}>State rate %</label>
+          <input type="number" step="0.001" value={statePct} onChange={e => setStatePct(e.target.value)} style={{ width: 100 }} />
+        </div>
+        <div className="form-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: '0.8rem' }}>Local rate %</label>
+          <input type="number" step="0.001" value={localPct} onChange={e => setLocalPct(e.target.value)} style={{ width: 100 }} />
+        </div>
+        <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={save} disabled={saving}>
+          {saving && <span className="spinner" />} <span>Save rates</span>
+        </button>
+        <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={refresh} disabled={refreshing}>
+          {refreshing && <span className="spinner" />} <span>Refresh from ZIP</span>
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -30,7 +30,7 @@ export function CreateCompanyPage() {
         variables: { input: { ...form, name: form.name.trim() } },
       });
       showToast(`Company "${data.createCompany.name}" created!`, 'success');
-      navigate(`/companies/${data.createCompany.id}/events`);
+      navigate(`/companies/${data.createCompany.id}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create company', 'error');
     } finally {

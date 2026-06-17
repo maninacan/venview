@@ -47,6 +47,11 @@ interface ReportSummary {
 
 interface TaxInfo {
   stateRate?: number | null;
+  localRate?: number | null;
+  stateTax?: number | null;
+  localTax?: number | null;
+  taxCollected?: number | null;
+  jurisdiction?: { state?: string; county?: string; city?: string } | null;
   stateFoodTax?: number | null;
   taxDetail?: { state?: string } | null;
 }
@@ -122,11 +127,13 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
   }
 
   const stateRate = Number(taxes?.stateRate ?? 0);
-  const stateRatePct = (stateRate * 100).toFixed(2);
-  const stateName = taxes?.taxDetail?.state ?? '';
-  const salesTaxLabel = stateName
-    ? `Sales Tax Collected — Remit to ${stateName} (${stateRatePct}%)`
-    : `Sales Tax Collected — Remit to State (${stateRatePct}%)`;
+  const localRate = Number(taxes?.localRate ?? 0);
+  const stateTax = Number(taxes?.stateTax ?? 0);
+  const localTax = Number(taxes?.localTax ?? 0);
+  const taxCollected = Number(taxes?.taxCollected ?? 0);
+  const jName = taxes?.jurisdiction ?? null;
+  const stateLabel = `Sales tax — remit to ${jName?.state || 'State'} (${(stateRate * 100).toFixed(2)}%)`;
+  const localLabel = `Sales tax — remit to ${jName?.city || jName?.county || 'Local'} (${(localRate * 100).toFixed(2)}%)`;
 
   return (
     <CollapsibleCard title="Event Profit Summary" defaultOpen={true}>
@@ -188,8 +195,10 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
           )}
         </div>
         <LedgerRow label="Tips (pass-through to staff)" value={fmt(summary.tips)} info />
-        <LedgerRow label={salesTaxLabel} value={fmt(summary.stateFoodTax)} info />
-        <p className="text-[0.76rem] text-[#64748b] mt-[7px]">ⓘ Income taxes are calculated annually — consult your accountant.</p>
+        <LedgerRow label={stateLabel} value={fmt(stateTax)} info />
+        <LedgerRow label={localLabel} value={fmt(localTax)} info />
+        <LedgerRow label="Total sales tax collected (to remit)" value={fmt(taxCollected)} info />
+        <p className="text-[0.76rem] text-[#64748b] mt-[7px]">ⓘ Sales tax is collected on behalf of the taxing authorities and excluded from profit. Income taxes are calculated annually — consult your accountant.</p>
       </div>
     </CollapsibleCard>
   );

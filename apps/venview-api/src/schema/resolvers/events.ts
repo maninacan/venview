@@ -2,6 +2,7 @@ import type { AppContext } from '../../context/index.js';
 import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
 import { computeProfit } from '../../lib/profit.js';
+import { applyTaxRates } from './sales.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,11 +77,32 @@ async function buildEventReport(eventId: string) {
         (s: number, r: Record<string, unknown>) => s + Number(r['total'] ?? 0), 0
       ),
     },
-    taxes: {
-      stateRate: taxRate,
-      stateFoodTax: summary.stateFoodTax,
-      taxDetail: null,
-    },
+    taxes: (() => {
+      const sr = sales as Record<string, unknown> | null;
+      const stateRate = Number(sr?.['stateTaxRate'] ?? 0);
+      const localRate = Number(sr?.['localTaxRate'] ?? 0);
+      const combinedRate = Number(sr?.['taxRate'] ?? 0) || (stateRate + localRate);
+      const taxBase = Number(sr?.['totalCollected'] ?? 0) || Number(sr?.['netSales'] ?? 0);
+      // Square actuals are the truth when synced; otherwise compute rate × base.
+      const taxCollected = ev['squareLocationId']
+        ? Number(sr?.['taxCollected'] ?? 0)
+        : +(taxBase * combinedRate).toFixed(2);
+      const split = stateRate + localRate > 0 ? stateRate / (stateRate + localRate) : 0;
+      const stateTax = +(taxCollected * split).toFixed(2);
+      const localTax = +(taxCollected - stateTax).toFixed(2);
+      return {
+        stateRate,
+        localRate,
+        combinedRate,
+        stateTax,
+        localTax,
+        taxCollected,
+        jurisdiction: sr?.['taxJurisdiction'] ?? null,
+        // legacy aliases retained for safety
+        stateFoodTax: taxCollected,
+        taxDetail: sr?.['taxJurisdiction'] ?? null,
+      };
+    })(),
     summary,
     inventorySales: (inventorySales ?? []).map((r: Record<string, unknown>) => ({
       name: r['name'],
@@ -285,6 +307,9 @@ export const eventResolvers = {
         );
       }
 
+      // Best-effort: auto-look-up sales tax rates from the event ZIP.
+      await applyTaxRates(eventID).catch(() => undefined);
+
       return rowToEvent(event as Record<string, unknown>);
     },
 
@@ -315,6 +340,9 @@ export const eventResolvers = {
           );
         }
       }
+
+      // Re-look-up tax rates when the event ZIP changes (best-effort).
+      if ('zipCode' in eventFields) await applyTaxRates(id).catch(() => undefined);
 
       return rowToEvent(data as Record<string, unknown>);
     },

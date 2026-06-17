@@ -103,6 +103,7 @@ export function Header({ companyId, companyName }: Props) {
           {inCompany && (
             <>
               <Link to="/companies" className={linkBase} onClick={closeMenu}><i className="fa-solid fa-arrow-left w-4 text-center" /> Companies</Link>
+              <NavLink to={`/companies/${companyId}`} end className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-house w-4 text-center" /> Home</NavLink>
               <NavLink to={`/companies/${companyId}/events`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-calendar-days w-4 text-center" /> Events</NavLink>
               <NavLink to={`/companies/${companyId}/recipes`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-utensils w-4 text-center" /> Recipes</NavLink>
               <NavLink to={`/companies/${companyId}/inventory`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-boxes-stacked w-4 text-center" /> My Inventory</NavLink>

@@ -12,6 +12,7 @@ import { RestockPage } from '../pages/restock/RestockPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
 import { BillingPage } from '../pages/billing/BillingPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
+import { HomePage } from '../pages/home/HomePage';
 import { CompanyLayout, RootLayout } from '../components/layout/Layout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ErrorElement } from '../components/layout/ErrorElement';
@@ -37,7 +38,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute><CompanyLayout /></ProtectedRoute>,
     errorElement: <ErrorElement />,
     children: [
-      { index: true, element: <Navigate to="events" replace /> },
+      { index: true, element: <HomePage /> },
       { path: 'events', element: <EventsPage /> },
       { path: 'events/new', element: <AddEventPage /> },
       { path: 'events/:eventId', element: <EventDashboardPage />, errorElement: <ErrorElement /> },
