@@ -15,14 +15,14 @@ const GET_EVENT = gql`
     event(id: $id) {
       id eventName eventType eventRating eventDate applicationDate
       eventLocation zipCode permits eventHost coordinator employees notes
-      squareLocationId numDays
+      posLocationId numDays
       days { id dayNumber date startTime endTime }
     }
   }
 `;
-const GET_SQUARE_LOCATIONS = gql`
-  query GetSquareLocations($companyId: ID!) {
-    squareLocations(companyId: $companyId) { id name }
+const GET_POS_LOCATIONS = gql`
+  query GetPosLocations($companyId: ID!) {
+    posLocations(companyId: $companyId) { id name }
   }
 `;
 const CREATE_EVENT = gql`
@@ -74,7 +74,7 @@ const EMPTY_FORM = {
   eventDate: '', applicationDate: '',
   eventLocation: '', zipCode: '', permits: '',
   eventHost: '', coordinator: '', employees: '', notes: '',
-  squareLocationId: '',
+  posLocationId: '',
 };
 type EventFormState = typeof EMPTY_FORM;
 
@@ -90,13 +90,13 @@ export function AddEventPage() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: setupData } = useQuery(GET_SQUARE_LOCATIONS, { variables: { companyId }, skip: !companyId });
+  const { data: setupData } = useQuery(GET_POS_LOCATIONS, { variables: { companyId }, skip: !companyId });
   const { data: editData } = useQuery(GET_EVENT, { variables: { id: eventId }, skip: !isEdit });
 
   const [createEvent] = useMutation(CREATE_EVENT);
   const [updateEvent] = useMutation(UPDATE_EVENT);
 
-  const squareLocations: Array<{ id: string; name: string }> = setupData?.squareLocations ?? [];
+  const posLocations: Array<{ id: string; name: string }> = setupData?.posLocations ?? [];
 
   function setField<K extends keyof EventFormState>(key: K, val: string) {
     setForm(f => ({ ...f, [key]: val }));
@@ -111,7 +111,7 @@ export function AddEventPage() {
       eventDate: ev.eventDate ?? '', applicationDate: ev.applicationDate ?? '',
       eventLocation: ev.eventLocation ?? '', zipCode: ev.zipCode ?? '', permits: ev.permits ?? '',
       eventHost: ev.eventHost ?? '', coordinator: ev.coordinator ?? '', employees: ev.employees ?? '',
-      notes: ev.notes ?? '', squareLocationId: ev.squareLocationId ?? '',
+      notes: ev.notes ?? '', posLocationId: ev.posLocationId ?? '',
     });
     setNumDays(ev.numDays ?? 1);
     setDays((ev.days ?? []).map((d: { dayNumber: number; date: string; startTime: string; endTime: string }) => ({
@@ -144,7 +144,7 @@ export function AddEventPage() {
       coordinator: form.coordinator || null,
       employees: form.employees || null,
       notes: form.notes || null,
-      squareLocationId: form.squareLocationId || null,
+      posLocationId: form.posLocationId || null,
       numDays,
     };
     if (numDays > 1) {
@@ -317,18 +317,18 @@ export function AddEventPage() {
           <input type="file" ref={fileInputRef} multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.doc,.docx" />
         </div>
 
-        {/* Square location */}
-        <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Square Location</label>
-        {squareLocations.length === 0 ? (
+        {/* POS location */}
+        <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>POS Location</label>
+        {posLocations.length === 0 ? (
           <div style={{ background: '#eff6ff', border: '1px dashed #93c5fd', borderRadius: 8, padding: '12px 14px', margin: '6px 0 4px', fontSize: '0.85rem' }}>
-            <div style={{ fontWeight: 700, color: 'var(--vv-navy)' }}>📍 No Square locations found</div>
-            <div style={{ color: '#3b6fb0' }}>Connect your Square account to link a location and enable automatic sales sync.</div>
-            <a href={`/companies/${companyId}/settings`} style={{ color: '#0085b0', fontWeight: 600 }}>Connect Square in Settings →</a>
+            <div style={{ fontWeight: 700, color: 'var(--vv-navy)' }}>📍 No POS locations found</div>
+            <div style={{ color: '#3b6fb0' }}>Connect your POS in Settings to link a location and enable automatic sales sync.</div>
+            <a href={`/companies/${companyId}/settings`} style={{ color: '#0085b0', fontWeight: 600 }}>Connect your POS in Settings →</a>
           </div>
         ) : (
-          <select value={form.squareLocationId} onChange={e => setField('squareLocationId', e.target.value)} style={{ marginTop: 6 }}>
-            <option value="">Select Square Location…</option>
-            {squareLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+          <select value={form.posLocationId} onChange={e => setField('posLocationId', e.target.value)} style={{ marginTop: 6 }}>
+            <option value="">Select location…</option>
+            {posLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
           </select>
         )}
 

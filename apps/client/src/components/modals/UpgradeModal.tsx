@@ -34,7 +34,7 @@ export function UpgradeModal({ context, onClose }: Props) {
             className="absolute top-3.5 right-3.5 bg-transparent border-0 text-[1.1rem] cursor-pointer text-[rgba(255,255,255,0.7)] px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.1)]"
             onClick={onClose}
           ><i className="fa-solid fa-xmark" /></button>
-          <div className="inline-block bg-[#FFD84D] text-[#0B2A4A] text-[0.76rem] font-bold px-[11px] py-[3px] rounded-full"><i className="fa-solid fa-bolt" /> Venview Pro</div>
+          <div className="inline-block bg-[#FFD84D] text-[#0B2A4A] text-[0.76rem] font-bold px-[11px] py-[3px] rounded-full"><i className="fa-solid fa-bolt" /> venOS Pro</div>
           <h2 className="text-white mt-2 mb-1 text-[1.35rem]">Unlock the complete picture.</h2>
           <p className="text-[rgba(255,255,255,0.78)] text-[0.86rem] m-0">See every event's true profit, track trends over time, and make smarter decisions — faster.</p>
         </div>
@@ -76,7 +76,7 @@ export function UpgradeModal({ context, onClose }: Props) {
           </ul>
           <div className="flex items-center gap-2 bg-[#f8fafc] rounded-lg px-3 py-[9px] text-[0.8rem] text-[#64748b]">
             <i className="fa-solid fa-clipboard-list" />
-            <span>You're on <strong>Venview Starter</strong> — includes 1 finalized event and basic profit summary.</span>
+            <span>You're on <strong>venOS Starter</strong> — includes 1 finalized event and basic profit summary.</span>
           </div>
         </div>
 

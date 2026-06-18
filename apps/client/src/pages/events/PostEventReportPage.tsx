@@ -9,7 +9,7 @@ const GET_REPORT = gql`
     eventReport(id: $id) {
       event {
         id eventName eventDate endDate numDays isFinalized finalizedDate
-        squareLocationId status eventType eventHost eventLocation
+        posLocationId status eventType eventHost eventLocation
         coordinator time eventRating applicationDate notes customFields
       }
       sales {

@@ -28,9 +28,13 @@ export const typeDefs = `#graphql
     pendingRequests: [CompanyMember!]!
     "User id with a pending ownership offer, if any."
     pendingOwnerId: ID
-    squareStatus: SquareStatus
+    posStatus: PosStatus
     "True when a TaxJar API token is stored for this company (the token itself is never exposed)."
     taxjarConnected: Boolean
+    "Onboarding answer: 'square' | 'manual' (others reserved)."
+    posSystem: String
+    "Onboarding answer: 'pos' | 'other' | 'flat_rate'."
+    laborMethod: String
   }
 
   type AccessRequestResult {
@@ -81,7 +85,7 @@ export const typeDefs = `#graphql
     coordinator: String
     notes: String
     zipCode: String
-    squareLocationId: String
+    posLocationId: String
     time: String
     applicationDate: String
     eventRating: String
@@ -142,6 +146,7 @@ export const typeDefs = `#graphql
     name: String
     hours: Float
     wage: Float
+    flatRate: Float
     total: Float
   }
 
@@ -237,7 +242,7 @@ export const typeDefs = `#graphql
     coordinator: String
     notes: String
     zipCode: String
-    squareLocationId: String
+    posLocationId: String
     time: String
     applicationDate: String
     eventRating: String
@@ -266,7 +271,7 @@ export const typeDefs = `#graphql
     coordinator: String
     notes: String
     zipCode: String
-    squareLocationId: String
+    posLocationId: String
     time: String
     applicationDate: String
     eventRating: String
@@ -298,8 +303,10 @@ export const typeDefs = `#graphql
   input LaborEntryInput {
     employeeId: ID
     name: String
-    hours: Float!
-    wage: Float!
+    hours: Float
+    wage: Float
+    "Fixed amount for the shift; when set, overrides hours × wage."
+    flatRate: Float
   }
 
   input SupplyInput {
@@ -414,18 +421,19 @@ export const typeDefs = `#graphql
   }
 
   # ─── Square ──────────────────────────────────────────────────────────────────
-  type SquareStatus {
+  type PosStatus {
     connected: Boolean!
+    provider: String
     locationName: String
     locationId: String
   }
 
-  type SquareLocation {
+  type PosLocation {
     id: String!
     name: String!
   }
 
-  type SquareCatalogItem {
+  type PosCatalogItem {
     posItemId: String!
     posItemName: String!
     variationName: String
@@ -519,9 +527,8 @@ export const typeDefs = `#graphql
     me: Me
 
     company(id: ID!): Company
-    squareLocations(companyId: ID!): [SquareLocation!]!
-    squareCatalog(companyId: ID!): [SquareCatalogItem!]!
-    squareStatus(companyId: ID!): SquareStatus!
+    posLocations(companyId: ID!): [PosLocation!]!
+    posCatalog(companyId: ID!): [PosCatalogItem!]!
 
     events(companyId: ID!, filter: String, search: String, page: Int): [Event!]!
     event(id: ID!): Event
@@ -553,6 +560,7 @@ export const typeDefs = `#graphql
     requestAccess(joinCode: String!): AccessRequestResult!
     approveMember(companyId: ID!, userId: ID!): Boolean!
     inviteMember(companyId: ID!, email: String!): InviteResult!
+    setCompanyProfile(companyId: ID!, posSystem: String, laborMethod: String): Company!
     setTaxjarToken(companyId: ID!, token: String!): Boolean!
     removeTaxjarToken(companyId: ID!): Boolean!
     leaveCompany(companyId: ID!): Boolean!
@@ -569,7 +577,7 @@ export const typeDefs = `#graphql
     claimUnownedEvents(companyId: ID!): Int!
 
     # Sales
-    syncSquareSales(eventId: ID!): SyncResult!
+    syncSales(eventId: ID!): SyncResult!
     updateManualSales(eventId: ID!, input: ManualSalesInput!): SalesSummary!
     setEventTaxRates(eventId: ID!, stateTaxRate: Float!, localTaxRate: Float!): SalesSummary!
     refreshEventTaxRates(eventId: ID!): SalesSummary!
@@ -579,7 +587,7 @@ export const typeDefs = `#graphql
     updateExpenses(eventId: ID!, input: ExpensesInput!): EventExpenses!
 
     # Labor
-    syncSquareLabor(eventId: ID!): SyncResult!
+    syncLabor(eventId: ID!): SyncResult!
     createLaborEntry(eventId: ID!, input: LaborEntryInput!): LaborEntry!
     updateLaborEntry(id: ID!, input: LaborEntryInput!): LaborEntry!
     deleteLaborEntry(id: ID!): Boolean!

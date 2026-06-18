@@ -240,6 +240,29 @@ export const companyResolvers = {
       return { email: normalized, status: invited ? 'invited' : 'added' };
     },
 
+    // Save onboarding answers (POS choice + labor method). Any active member can set.
+    setCompanyProfile: async (
+      _: unknown,
+      { companyId, posSystem, laborMethod }: { companyId: string; posSystem?: string | null; laborMethod?: string | null },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user.id);
+
+      const patch: Record<string, unknown> = {};
+      if (posSystem !== undefined) patch['posSystem'] = posSystem;
+      if (laborMethod !== undefined) patch['laborMethod'] = laborMethod;
+
+      const { data, error } = await supabase
+        .from('Companies')
+        .update(patch)
+        .eq('id', companyId)
+        .select()
+        .single();
+      if (error || !data) throw new Error(error?.message ?? 'Failed to save company profile');
+      return data;
+    },
+
     // Store the company's own TaxJar API token, encrypted at rest (owner only).
     setTaxjarToken: async (
       _: unknown,
@@ -386,18 +409,24 @@ export const companyResolvers = {
       return membersByStatus(company['id'] as string, 'pending');
     },
 
-    squareStatus: async (company: Record<string, unknown>) => {
+    posStatus: async (company: Record<string, unknown>) => {
+      const provider = (company['posSystem'] as string | null) ?? null;
+      // Only 'manual'/unset means definitively no provider; otherwise look up the connection.
       const { data } = await supabase
-        .from('SquareConnection')
-        .select('locationId, locationName')
+        .from('PosConnection')
+        .select('provider, locationId, locationName')
         .eq('companyId', company['id'])
-        .single();
+        .order('createdAt', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (!data) return { connected: false };
+      if (!data) return { connected: false, provider };
+      const row = data as Record<string, unknown>;
       return {
         connected: true,
-        locationId: (data as Record<string, unknown>)['locationId'],
-        locationName: (data as Record<string, unknown>)['locationName'],
+        provider: (row['provider'] as string) ?? provider,
+        locationId: row['locationId'],
+        locationName: row['locationName'],
       };
     },
   },

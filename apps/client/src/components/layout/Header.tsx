@@ -66,13 +66,13 @@ export function Header({ companyId, companyName }: Props) {
         className="flex items-center gap-2.5 no-underline flex-shrink-0"
         onClick={closeMenu}
       >
-        <img src={venviewLogo} alt="VenView" className="h-[50px] w-auto" />
+        <img src={venviewLogo} alt="venOS" className="h-[50px] w-auto" />
         <div>
           <span
             className="block text-[1.05rem] leading-tight font-bold"
             style={{ color: '#2E7D32' }}
           >
-            VenView Events
+            venOS Events
           </span>
           <span className="block text-[0.68rem] text-[#666]">
             {companyName ?? 'Vendor Intelligence for Events'}

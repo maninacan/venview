@@ -6,7 +6,7 @@
 export type EventPhase = 'plan' | 'reconcile' | 'finalize' | 'done';
 
 export type NextAction =
-  | 'pull-sales'      // link/pull Square sales
+  | 'pull-sales'      // link/pull POS sales
   | 'enter-sales'     // manual sales entry
   | 'add-costs'       // labor & expenses
   | 'review-finalize' // open profit summary / finalize
@@ -21,10 +21,10 @@ export interface EventStage {
 
 export interface EventStageInput {
   isFinalized?: boolean | null;
-  squareLocationId?: string | null;
+  posLocationId?: string | null;
   sales?: { grossSales?: number | null; netSales?: number | null } | null;
-  /** Whether the company has connected Square (optional context). */
-  squareConnected?: boolean;
+  /** Whether the company has connected a POS (optional context). */
+  posConnected?: boolean;
 }
 
 export function hasSales(sales: EventStageInput['sales']): boolean {
@@ -38,6 +38,25 @@ export const PHASE_LABELS: Record<Exclude<EventPhase, 'done'>, string> = {
   finalize: 'Finalize',
 };
 
+// Is the event upcoming (hasn't happened yet) or past? "past" only once today is
+// strictly after the event's last day (endDate, or eventDate + numDays-1).
+export function deriveEventTiming(
+  ev: { eventDate?: string | null; endDate?: string | null; numDays?: number | null },
+  today: Date = new Date(),
+): 'upcoming' | 'past' {
+  const start = ev.eventDate;
+  if (!start) return 'upcoming';
+  let lastISO = ev.endDate || start;
+  if (!ev.endDate && ev.numDays && ev.numDays > 1) {
+    const [y, m, d] = start.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + (ev.numDays - 1));
+    lastISO = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return todayISO > lastISO ? 'past' : 'upcoming';
+}
+
 export function deriveEventStage(ev: EventStageInput): EventStage {
   // Finalized → nothing left but the report.
   if (ev.isFinalized) {
@@ -49,13 +68,13 @@ export function deriveEventStage(ev: EventStageInput): EventStage {
     return { phase: 'finalize', stepIndex: 2, nextStep: { label: 'Review & finalize', action: 'review-finalize' } };
   }
 
-  // No sales yet → reconcile. Prefer Square if it can pull, else manual entry.
-  const canPull = !!ev.squareLocationId && ev.squareConnected !== false;
+  // No sales yet → reconcile. Prefer POS pull if available, else manual entry.
+  const canPull = !!ev.posLocationId && ev.posConnected !== false;
   return {
     phase: 'reconcile',
     stepIndex: 1,
     nextStep: canPull
-      ? { label: 'Pull Square sales', action: 'pull-sales' }
+      ? { label: 'Pull POS sales', action: 'pull-sales' }
       : { label: 'Enter sales', action: 'enter-sales' },
   };
 }

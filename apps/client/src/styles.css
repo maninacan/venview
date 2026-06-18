@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @source "../../../libs/common-components/src";
 
-/* ── VenView Design Tokens ──────────────────────────────────────── */
+/* ── venOS Design Tokens ──────────────────────────────────────── */
 :root {
   --vv-navy:        #0B2A4A;
   --vv-navy-2:      #0A3A67;

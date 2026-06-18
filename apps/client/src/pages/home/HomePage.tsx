@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
@@ -5,12 +6,13 @@ import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { useCompanyJourney } from '../../hooks/useCompanyJourney';
 import { NextStepBanner } from '../../components/guidance/NextStepBanner';
 import { OnboardingChecklist } from '../../components/guidance/OnboardingChecklist';
+import { OnboardingQuestions } from '../../components/guidance/OnboardingQuestions';
 import { deriveEventStage, PHASE_LABELS, type EventStage } from '../../lib/eventStage';
 
 const GET_HOME_EVENTS = gql`
   query GetHomeEvents($companyId: ID!) {
     events(companyId: $companyId) {
-      id eventName eventDate isFinalized squareLocationId
+      id eventName eventDate isFinalized posLocationId
       sales { grossSales netSales }
     }
   }
@@ -18,7 +20,7 @@ const GET_HOME_EVENTS = gql`
 
 interface HomeEvent {
   id: string; eventName: string; eventDate: string | null;
-  isFinalized: boolean; squareLocationId: string | null;
+  isFinalized: boolean; posLocationId: string | null;
   sales: { grossSales: number | null; netSales: number | null } | null;
 }
 
@@ -36,13 +38,16 @@ const PHASE_CHIP: Record<string, string> = {
 
 export function HomePage() {
   const { companyId, company } = useCurrentCompany();
-  const squareConnected = !!company?.squareStatus?.connected;
+  const posConnected = !!company?.posStatus?.connected;
   const journey = useCompanyJourney(companyId);
+
+  const questionsSkipKey = `venview_onboarding_q_skipped_${companyId}`;
+  const [questionsSkipped, setQuestionsSkipped] = useState(() => localStorage.getItem(questionsSkipKey) === '1');
 
   const { data } = useQuery(GET_HOME_EVENTS, { variables: { companyId }, skip: !companyId });
   const events: HomeEvent[] = data?.events ?? [];
 
-  const withStage = events.map(e => ({ event: e, stage: deriveEventStage({ ...e, squareConnected }) }));
+  const withStage = events.map(e => ({ event: e, stage: deriveEventStage({ ...e, posConnected }) }));
   const activeEvents = withStage.filter(w => w.stage.phase !== 'done');
 
   // Pick the single most important next action.
@@ -71,6 +76,14 @@ export function HomePage() {
       </div>
 
       {banner && <NextStepBanner {...banner} />}
+
+      {companyId && !journey.loading && !journey.answered && !questionsSkipped && (
+        <OnboardingQuestions
+          companyId={companyId}
+          onSaved={() => journey.refetch()}
+          onSkip={() => { localStorage.setItem(questionsSkipKey, '1'); setQuestionsSkipped(true); }}
+        />
+      )}
 
       {!journey.dismissed && (
         <OnboardingChecklist

@@ -9,7 +9,7 @@ import { showToast } from '@org/data';
 const GET_EVENTS = gql`
   query GetEvents($companyId: ID!, $filter: String, $search: String) {
     events(companyId: $companyId, filter: $filter, search: $search) {
-      id eventName eventDate status isFinalized squareLocationId
+      id eventName eventDate status isFinalized posLocationId
       netProfit
       sales { grossSales netSales }
     }

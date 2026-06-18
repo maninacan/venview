@@ -45,21 +45,22 @@ async function refreshSquareToken(companyId: string, row: Record<string, unknown
   const newRefresh = tokenResponse.refreshToken!;
   const expiresAt = tokenResponse.expiresAt;
 
-  await supabase.from('SquareConnection').update({
+  await supabase.from('PosConnection').update({
     accessToken: encryptToken(accessToken),
     refreshToken: encryptToken(newRefresh),
-    merchantId: tokenResponse.merchantId,
-    createdAt: expiresAt ?? new Date().toISOString(),
-  }).eq('companyId', companyId);
+    externalId: tokenResponse.merchantId,
+    expiresAt: expiresAt ?? new Date().toISOString(),
+  }).eq('companyId', companyId).eq('provider', 'square');
 
   return accessToken;
 }
 
 export async function getSquareToken(companyId: string): Promise<string> {
   const { data, error } = await supabase
-    .from('SquareConnection')
-    .select('accessToken, refreshToken, createdAt')
+    .from('PosConnection')
+    .select('accessToken, refreshToken, expiresAt')
     .eq('companyId', companyId)
+    .eq('provider', 'square')
     .single();
 
   if (error || !data) {
@@ -71,7 +72,7 @@ export async function getSquareToken(companyId: string): Promise<string> {
   if (!accessEnc) throw new Error('Square connection has no access token. Please reconnect.');
 
   // Proactively refresh if token is expiring within 30 days
-  const expiresAt = row['createdAt'] as string | null;
+  const expiresAt = row['expiresAt'] as string | null;
   if (expiresAt && row['refreshToken']) {
     const expiresDate = new Date(expiresAt);
     const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);

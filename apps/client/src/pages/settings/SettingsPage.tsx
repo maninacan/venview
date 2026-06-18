@@ -9,10 +9,10 @@ import { PosMappingModal } from '../../components/modals/PosMappingModal';
 const GET_SETTINGS = gql`
   query GetSettings($companyId: ID!) {
     company(id: $companyId) {
-      id name phone contactName vendorCategory email joinCode plan pendingOwnerId taxjarConnected
+      id name phone contactName vendorCategory email joinCode plan pendingOwnerId taxjarConnected posSystem
       members { userId email role }
       pendingRequests { userId email role }
-      squareStatus { connected locationName locationId }
+      posStatus { connected provider locationName locationId }
     }
   }
 `;
@@ -79,6 +79,16 @@ const DELETE_COMPANY = gql`
 
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
 
+// Client-side mirror of the server POS registry. `implemented` gates the
+// connect flow; capabilities drive which actions appear. Keep in sync with
+// apps/venview-api/src/lib/pos/index.ts.
+interface PosMeta { displayName: string; blurb: string; implemented: boolean; }
+const POS_META: Record<string, PosMeta> = {
+  square: { displayName: 'Square', blurb: 'Sync sales, locations & labor automatically', implemented: true },
+  shopify: { displayName: 'Shopify', blurb: 'Sync sales automatically', implemented: false },
+  toast: { displayName: 'Toast', blurb: 'Sync sales & labor automatically', implemented: false },
+};
+
 export function SettingsPage() {
   const { companyId, company } = useCurrentCompany();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -105,7 +115,7 @@ export function SettingsPage() {
   const [showPosMappings, setShowPosMappings] = useState(false);
   const [companyForm, setCompanyForm] = useState({ name: '', phone: '', contactName: '', vendorCategory: '', email: '' });
   const [savingCompany, setSavingCompany] = useState(false);
-  const [connectingSquare, setConnectingSquare] = useState(false);
+  const [connectingPos, setConnectingPos] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joiningCode, setJoiningCode] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -116,7 +126,10 @@ export function SettingsPage() {
   const [savingTaxjar, setSavingTaxjar] = useState(false);
 
   const info = data?.company;
-  const squareStatus = info?.squareStatus;
+  const posStatus = info?.posStatus;
+  // The company's chosen POS (falls back to Square for legacy companies).
+  const provider = (posStatus?.provider ?? info?.posSystem ?? 'square') as string;
+  const posMeta = POS_META[provider] ?? POS_META['square'];
   const members = info?.members ?? [];
   const pendingRequests = info?.pendingRequests ?? [];
   const isOwner = members.some((m: { userId: string; role: string }) => m.userId === user?.id && m.role === 'owner');
@@ -142,49 +155,49 @@ export function SettingsPage() {
 
   // Handle post-OAuth redirect
   useEffect(() => {
-    const sq = searchParams.get('sq');
-    if (sq === 'connected') {
-      showToast('✅ Square connected successfully! Your locations are now available.', 'success', 6000);
+    const pos = searchParams.get('pos');
+    if (pos === 'connected') {
+      showToast('✅ POS connected successfully! Your locations are now available.', 'success', 6000);
       setSearchParams({});
       refetch();
-    } else if (sq === 'error') {
-      showToast('Square connection failed. Please try again.', 'error');
+    } else if (pos === 'error') {
+      showToast('POS connection failed. Please try again.', 'error');
       setSearchParams({});
     }
   }, [searchParams, setSearchParams, refetch]);
 
-  async function handleConnectSquare() {
-    setConnectingSquare(true);
+  async function handleConnectPos() {
+    setConnectingPos(true);
     try {
       const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(`${API_URL}/api/square/oauth/start?companyId=${companyId}`, {
+      const res = await fetch(`${API_URL}/api/pos/${provider}/oauth/start?companyId=${companyId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const result = await res.json() as { url?: string; error?: string };
       if (!result.url) throw new Error(result.error ?? 'Failed to get OAuth URL');
       window.location.href = result.url;
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to connect Square', 'error');
-      setConnectingSquare(false);
+      showToast(err instanceof Error ? err.message : `Failed to connect ${posMeta.displayName}`, 'error');
+      setConnectingPos(false);
     }
   }
 
-  async function handleDisconnectSquare() {
-    if (!confirm('Disconnect Square? You will need to reconnect to sync sales.')) return;
+  async function handleDisconnectPos() {
+    if (!confirm(`Disconnect ${posMeta.displayName}? You will need to reconnect to sync sales.`)) return;
     try {
       const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(`${API_URL}/api/square/disconnect/${companyId}`, {
+      const res = await fetch(`${API_URL}/api/pos/${provider}/disconnect/${companyId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('Disconnect failed');
-      showToast('Square disconnected.', 'info');
+      showToast(`${posMeta.displayName} disconnected.`, 'info');
       refetch();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to disconnect', 'error');
@@ -384,7 +397,7 @@ export function SettingsPage() {
 
   return (
     <>
-      {/* Square Integration */}
+      {/* POS Integration */}
       <div className="card">
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>Settings</h2>
@@ -402,38 +415,37 @@ export function SettingsPage() {
               </svg>
             </div>
             <div>
-              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">Square POS</h3>
-              <p className="m-0 text-[0.8rem] text-[#64748b]">Sync sales, locations &amp; labor automatically</p>
+              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">{posMeta.displayName} POS</h3>
+              <p className="m-0 text-[0.8rem] text-[#64748b]">{posMeta.blurb}</p>
             </div>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${squareStatus?.connected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
-              {squareStatus?.connected ? `✓ Connected${squareStatus.locationName ? ` — ${squareStatus.locationName}` : ''}` : 'Not Connected'}
+            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${posStatus?.connected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
+              {posStatus?.connected ? `✓ Connected${posStatus.locationName ? ` — ${posStatus.locationName}` : ''}` : posMeta.implemented ? 'Not Connected' : 'Coming Soon'}
             </span>
           </div>
 
-          {squareStatus?.connected ? (
+          {posStatus?.connected ? (
             <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => setShowPosMappings(true)}>
                 🗺 Manage POS Mappings
               </button>
-              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleDisconnectSquare}>
-                Disconnect Square
+              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleDisconnectPos}>
+                Disconnect {posMeta.displayName}
               </button>
+            </div>
+          ) : posMeta.implemented ? (
+            <div style={{ marginTop: 14 }}>
+              <button className="btn-primary" onClick={handleConnectPos} disabled={connectingPos}>
+                {connectingPos && <span className="spinner" />}
+                <span>Connect {posMeta.displayName}</span>
+              </button>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
+                Connect your {posMeta.displayName} account to automatically sync sales{posMeta.blurb.includes('labor') ? ', locations, and labor' : ' and locations'}.
+              </p>
             </div>
           ) : (
             <div style={{ marginTop: 14 }}>
-              <button className="btn-primary" onClick={handleConnectSquare} disabled={connectingSquare}>
-                {connectingSquare && <span className="spinner" />}
-                <span>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0 }}>
-                  <rect x=".5" y=".5" width="5" height="5" rx=".8" fill="white"/>
-                  <rect x="7.5" y=".5" width="5" height="5" rx=".8" fill="white"/>
-                  <rect x=".5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
-                  <rect x="7.5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
-                </svg>
-                Connect Square</span>
-              </button>
-              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
-                Connect your Square account to automatically sync sales, locations, and labor.
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: 0 }}>
+                {posMeta.displayName} support is coming soon.
               </p>
             </div>
           )}
@@ -627,7 +639,7 @@ export function SettingsPage() {
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Subscription</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className={`inline-flex items-center text-[0.88rem] font-semibold px-[14px] py-1 rounded-full ${info?.plan === 'pro' ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
-            {info?.plan === 'pro' ? <><i className="fa-solid fa-bolt" /> Venview Pro</> : <><i className="fa-solid fa-clipboard-list" /> Venview Starter</>}
+            {info?.plan === 'pro' ? <><i className="fa-solid fa-bolt" /> venOS Pro</> : <><i className="fa-solid fa-clipboard-list" /> venOS Starter</>}
           </span>
           {info?.plan !== 'pro' && (
             <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>

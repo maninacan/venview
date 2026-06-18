@@ -7,7 +7,9 @@ const GET_JOURNEY = gql`
   query GetCompanyJourney($companyId: ID!) {
     company(id: $companyId) {
       id
-      squareStatus { connected }
+      posSystem
+      laborMethod
+      posStatus { connected }
       members { userId }
     }
     eventKpi(companyId: $companyId) { totalEvents }
@@ -39,7 +41,7 @@ export function useCompanyJourney(companyId: string | null) {
   const [skips, setSkips] = useState<Set<string>>(() => readSet(skipsKey));
   const [dismissed, setDismissedState] = useState<boolean>(() => localStorage.getItem(dismissKey) === '1');
 
-  const { data, loading } = useQuery(GET_JOURNEY, { variables: { companyId }, skip: !companyId });
+  const { data, loading, refetch } = useQuery(GET_JOURNEY, { variables: { companyId }, skip: !companyId });
 
   const skipStep = useCallback((key: string) => {
     setSkips(prev => {
@@ -54,11 +56,16 @@ export function useCompanyJourney(companyId: string | null) {
     localStorage.setItem(dismissKey, value ? '1' : '0');
   }, [dismissKey]);
 
-  const squareConnected = !!data?.company?.squareStatus?.connected;
+  const posConnected = !!data?.company?.posStatus?.connected;
   const memberCount = data?.company?.members?.length ?? 0;
   const recipeCount = data?.recipes?.length ?? 0;
   const inventoryCount = data?.inventory?.length ?? 0;
   const eventCount = data?.eventKpi?.totalEvents ?? 0;
+  const posSystem = (data?.company?.posSystem ?? null) as string | null;
+  const laborMethod = (data?.company?.laborMethod ?? null) as string | null;
+  const answered = !!posSystem && !!laborMethod;
+  const POS_LABELS: Record<string, string> = { square: 'Square', shopify: 'Shopify', toast: 'Toast' };
+  const posName = posSystem && POS_LABELS[posSystem] ? POS_LABELS[posSystem] : 'your POS';
 
   const base: Array<Omit<JourneyStep, 'skipped'>> = [
     {
@@ -66,11 +73,11 @@ export function useCompanyJourney(companyId: string | null) {
       ctaLabel: 'Done', to: `/companies/${companyId}/settings`, done: true, optional: false,
     },
     {
-      key: 'square', label: 'Connect Square', description: 'Auto-sync sales, locations, and labor from your POS.',
-      ctaLabel: 'Connect Square', to: `/companies/${companyId}/settings`, done: squareConnected, optional: true,
+      key: 'pos', label: `Connect ${posName}`, description: 'Auto-sync sales (and labor) from your POS.',
+      ctaLabel: `Connect ${posName}`, to: `/companies/${companyId}/settings`, done: posConnected, optional: true,
     },
     {
-      key: 'recipes', label: 'Add your recipes', description: 'Define ingredient costs so VenView can calculate COGS.',
+      key: 'recipes', label: 'Add your recipes', description: 'Define ingredient costs so venOS can calculate COGS.',
       ctaLabel: 'Add recipes', to: `/companies/${companyId}/recipes`, done: recipeCount > 0, optional: true,
     },
     {
@@ -87,7 +94,10 @@ export function useCompanyJourney(companyId: string | null) {
     },
   ];
 
-  const steps: JourneyStep[] = base.map(s => ({ ...s, skipped: skips.has(s.key) }));
+  // Personalize from onboarding answers: a manual-POS company doesn't need the
+  // POS connection step at all.
+  const filtered = posSystem === 'manual' ? base.filter(s => s.key !== 'pos') : base;
+  const steps: JourneyStep[] = filtered.map(s => ({ ...s, skipped: skips.has(s.key) }));
 
   // Core path = company exists + first event created.
   const coreComplete = eventCount > 0;
@@ -95,5 +105,5 @@ export function useCompanyJourney(companyId: string | null) {
   const activeSteps = steps.filter(s => !s.done && !s.skipped);
   const doneCount = steps.filter(s => s.done).length;
 
-  return { loading, steps, activeSteps, coreComplete, dismissed, dismiss, skipStep, doneCount, total: steps.length };
+  return { loading, steps, activeSteps, coreComplete, dismissed, dismiss, skipStep, doneCount, total: steps.length, posSystem, laborMethod, answered, refetch };
 }

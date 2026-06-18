@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
@@ -6,7 +6,7 @@ import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { ProfitSummaryCard } from '../../components/dashboard/ProfitSummaryCard';
 import { EventStageStepper } from '../../components/guidance/EventStageStepper';
 import { NextStepBanner } from '../../components/guidance/NextStepBanner';
-import { deriveEventStage, PHASE_LABELS } from '../../lib/eventStage';
+import { deriveEventStage, deriveEventTiming, hasSales, PHASE_LABELS } from '../../lib/eventStage';
 import { showToast } from '@org/data';
 
 const GET_REPORT = gql`
@@ -14,7 +14,7 @@ const GET_REPORT = gql`
     eventReport(id: $id) {
       event {
         id eventName eventDate endDate numDays isFinalized finalizedDate
-        squareLocationId status eventType eventHost eventLocation
+        posLocationId status eventType eventHost eventLocation
         coordinator time eventRating applicationDate notes
       }
       sales {
@@ -41,6 +41,13 @@ const DELETE_EVENT = gql`
   mutation DeleteEvent($id: ID!) { deleteEvent(id: $id) }
 `;
 
+// Which POS providers support labor sync (mirrors the server registry
+// capabilities). Shopify is sales-only; Square and Toast also do labor.
+const POS_HAS_LABOR: Record<string, boolean> = { square: true, toast: true, shopify: false };
+function providerHasLabor(provider?: string | null) {
+  return provider ? POS_HAS_LABOR[provider] ?? false : false;
+}
+
 function fmt(v: number | null | undefined) { return `$${Number(v ?? 0).toFixed(2)}`; }
 function formatDate(d: string | null | undefined) {
   if (!d) return '—';
@@ -66,7 +73,12 @@ export function EventDashboardPage() {
   });
 
   const [deleteEvent] = useMutation(DELETE_EVENT);
+  const [syncSalesMut] = useMutation(gql`mutation AutoSyncSales($eventId: ID!) { syncSales(eventId: $eventId) { success } }`);
+  const [syncLaborMut] = useMutation(gql`mutation AutoSyncLabor($eventId: ID!) { syncLabor(eventId: $eventId) { success } }`);
   const [activeTab, setActiveTab] = useState(0);
+  const [autoPulling, setAutoPulling] = useState(false);
+  const [forceShowData, setForceShowData] = useState(false);
+  const autoPulledRef = useRef(false);
   const tabsRef = useRef<HTMLDivElement>(null);
   const finalizeRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +91,25 @@ export function EventDashboardPage() {
   const inventorySales = report?.inventorySales ?? [];
   const laborEntries = report?.laborEntries ?? [];
   const supplies = report?.supplies ?? [];
+
+  // Opening a PAST event with a POS connected + no sales yet → auto-pull sales
+  // (and labor, if the provider supports it) once. Guarded so it never re-pulls
+  // or clobbers entered data.
+  useEffect(() => {
+    if (autoPulledRef.current || !event || !eventId) return;
+    const isPast = deriveEventTiming(event) === 'past';
+    const canPull = !!company?.posStatus?.connected && !!event.posLocationId;
+    if (isPast && canPull && !hasSales(sales)) {
+      autoPulledRef.current = true;
+      setAutoPulling(true);
+      const pulls = [syncSalesMut({ variables: { eventId } })];
+      if (providerHasLabor(company?.posStatus?.provider)) {
+        pulls.push(syncLaborMut({ variables: { eventId } }));
+      }
+      Promise.allSettled(pulls).then(() => refetch()).finally(() => setAutoPulling(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.id, company?.posStatus?.connected, eventId]);
 
   async function handleDelete() {
     if (!confirm(`Delete "${event?.eventName}"? This cannot be undone.`)) return;
@@ -127,7 +158,7 @@ export function EventDashboardPage() {
     {
       title: 'Inventory Sales',
       content: inventorySales.length === 0 ? (
-        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>No Inventory Sales recorded. Pull Square Sales to populate.</p>
+        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>No Inventory Sales recorded. Pull sales to populate.</p>
       ) : (
         <div className="table-container">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
@@ -165,12 +196,10 @@ export function EventDashboardPage() {
     },
     {
       title: 'Labor',
-      headerRight: (
-        <button className="btn-secondary" onClick={() => showToast('Square labor sync coming in Phase 4', 'info')} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
-          Pull Square Labor
-        </button>
-      ),
-      content: <LaborSection eventId={eventId!} companyId={companyId!} laborEntries={laborEntries} onSaved={refetch} />,
+      headerRight: company?.posStatus?.connected && providerHasLabor(company?.posStatus?.provider)
+        ? <SyncLaborButton eventId={eventId!} posLocationId={event?.posLocationId} onSynced={refetch} />
+        : undefined,
+      content: <LaborSection eventId={eventId!} companyId={companyId!} laborEntries={laborEntries} laborMethod={company?.laborMethod} onSaved={refetch} />,
     },
     {
       title: 'Additional Fees',
@@ -186,7 +215,7 @@ export function EventDashboardPage() {
     },
     {
       title: 'Sales Tax',
-      content: <TaxSection eventId={eventId!} hasSquare={!!event?.squareLocationId} taxes={taxes} onSaved={refetch} />,
+      content: <TaxSection eventId={eventId!} hasPos={!!event?.posLocationId} taxes={taxes} onSaved={refetch} />,
     },
     {
       title: 'Ingredient Costs (Recipe Matching)',
@@ -198,9 +227,9 @@ export function EventDashboardPage() {
   // Lifecycle stage + the single recommended next action for this event.
   const stage = deriveEventStage({
     isFinalized: event?.isFinalized,
-    squareLocationId: event?.squareLocationId,
+    posLocationId: event?.posLocationId,
     sales,
-    squareConnected: !!company?.squareStatus?.connected,
+    posConnected: !!company?.posStatus?.connected,
   });
 
   function goToNextStep() {
@@ -212,12 +241,17 @@ export function EventDashboardPage() {
     }
   }
 
+  // Pre-event vs post-event: before the event happens (and before any sales),
+  // show a planning view rather than the reconcile/profit data.
+  const isUpcoming = deriveEventTiming(event ?? {}) === 'upcoming';
+  const showData = !isUpcoming || hasSales(sales) || forceShowData;
+
   // Pull-sales buttons for each connected integration. Only show a source when
   // its company-level connection exists; add future POS integrations here.
   const salesSourceButtons: ReactNode[] = [];
-  if (company?.squareStatus?.connected) {
+  if (company?.posStatus?.connected) {
     salesSourceButtons.push(
-      <SyncSquareSalesButton key="square" eventId={eventId!} squareLocationId={event?.squareLocationId} onSynced={refetch} />
+      <SyncSalesButton key="pos" eventId={eventId!} posLocationId={event?.posLocationId} onSynced={refetch} />
     );
   }
 
@@ -262,81 +296,112 @@ export function EventDashboardPage() {
 
       {/* ── Lifecycle stepper + next-step ── */}
       <EventStageStepper stage={stage} />
-      {stage.phase === 'done' ? (
-        <NextStepBanner
-          eyebrow="Finalized"
-          title="This event is finalized"
-          description="View or download the full profit report."
-          ctaLabel="View report"
-          to={`/companies/${companyId}/events/${eventId}/report`}
-        />
-      ) : (
-        <NextStepBanner
-          eyebrow={PHASE_LABELS[stage.phase]}
-          title={stage.nextStep.label}
-          description={stage.phase === 'finalize' ? 'Sales are in — review the numbers and lock the event.' : 'Capture this event’s sales, then add labor and expenses.'}
-          ctaLabel={stage.nextStep.label}
-          onClick={goToNextStep}
-        />
+
+      {autoPulling && (
+        <div className="bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] rounded-xl px-5 py-3 mb-4 text-[0.9rem] font-semibold flex items-center gap-2">
+          <span className="spinner spinner-dark" style={{ width: 16, height: 16, borderWidth: 2 }} />
+          Pulling your sales &amp; labor from your POS…
+        </div>
       )}
 
-      {/* ── Reconcile: event data tabs (Inventory Sales → Ingredient Costs) ── */}
-      <div ref={tabsRef} className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] overflow-hidden mb-2.5 shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
-        <div className="flex bg-[#f8fafc] border-b border-[rgba(11,42,74,0.12)]" role="tablist">
-          {tabs.map((t, i) => (
-            <button
-              key={t.title}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === i}
-              onClick={() => setActiveTab(i)}
-              className={`flex-1 min-w-0 px-2 py-2.5 text-[0.85rem] font-semibold break-words text-center border-0 bg-transparent cursor-pointer border-b-2 transition-colors ${activeTab === i ? 'text-[#0B2A4A] border-[#0B2A4A]' : 'text-[#64748b] border-transparent hover:text-[#0B2A4A]'}`}
-            >
-              {t.title}
-            </button>
-          ))}
-        </div>
-        <div className="px-[18px] pt-3.5 pb-[18px]">
-          {active.headerRight && <div className="flex justify-end mb-3">{active.headerRight}</div>}
-          {active.content}
-        </div>
-      </div>
+      {!autoPulling && (
+        isUpcoming && !showData ? (
+          <NextStepBanner
+            eyebrow="Upcoming"
+            title="This event hasn't happened yet"
+            description="Sales & labor will appear automatically after the event. You can fill in details now."
+            ctaLabel="Edit details"
+            to={`/companies/${companyId}/events/${eventId}/edit`}
+          />
+        ) : stage.phase === 'done' ? (
+          <NextStepBanner
+            eyebrow="Finalized"
+            title="This event is finalized"
+            description="View or download the full profit report."
+            ctaLabel="View report"
+            to={`/companies/${companyId}/events/${eventId}/report`}
+          />
+        ) : (
+          <NextStepBanner
+            eyebrow={PHASE_LABELS[stage.phase]}
+            title={stage.nextStep.label}
+            description={stage.phase === 'finalize' ? 'Sales are in — review the numbers and lock the event.' : 'Capture this event’s sales, then add labor and expenses.'}
+            ctaLabel={stage.nextStep.label}
+            onClick={goToNextStep}
+          />
+        )
+      )}
 
-      {/* Finalize: Event Profit Summary */}
-      <div ref={finalizeRef}>
-        <ProfitSummaryCard
-          eventId={eventId!}
-          isFinalized={Boolean(event?.isFinalized)}
-          sales={sales}
-          expenses={expenses}
-          summary={summary}
-          taxes={taxes}
-          onFinalized={refetch}
-        />
-      </div>
+      {!showData && (
+        <div className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] shadow-[0_4px_12px_rgba(11,42,74,0.08)] px-5 py-8 mb-2.5 text-center">
+          <div className="text-[2rem] mb-2">📅</div>
+          <h3 className="m-0 mb-1 text-[1.05rem] font-bold text-[#0B2A4A]">Planning mode</h3>
+          <p className="m-0 mb-4 text-[0.86rem] text-[#64748b]">Sales, labor, and profit show up after the event. Use this time to finalize the details.</p>
+          <button className="btn-secondary" onClick={() => setForceShowData(true)}>Enter data anyway</button>
+        </div>
+      )}
+
+      {showData && (
+        <>
+          {/* ── Reconcile: event data tabs (Inventory Sales → Ingredient Costs) ── */}
+          <div ref={tabsRef} className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] overflow-hidden mb-2.5 shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
+            <div className="flex bg-[#f8fafc] border-b border-[rgba(11,42,74,0.12)]" role="tablist">
+              {tabs.map((t, i) => (
+                <button
+                  key={t.title}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === i}
+                  onClick={() => setActiveTab(i)}
+                  className={`flex-1 min-w-0 px-2 py-2.5 text-[0.85rem] font-semibold break-words text-center border-0 bg-transparent cursor-pointer border-b-2 transition-colors ${activeTab === i ? 'text-[#0B2A4A] border-[#0B2A4A]' : 'text-[#64748b] border-transparent hover:text-[#0B2A4A]'}`}
+                >
+                  {t.title}
+                </button>
+              ))}
+            </div>
+            <div className="px-[18px] pt-3.5 pb-[18px]">
+              {active.headerRight && <div className="flex justify-end mb-3">{active.headerRight}</div>}
+              {active.content}
+            </div>
+          </div>
+
+          {/* Finalize: Event Profit Summary */}
+          <div ref={finalizeRef}>
+            <ProfitSummaryCard
+              eventId={eventId!}
+              isFinalized={Boolean(event?.isFinalized)}
+              sales={sales}
+              expenses={expenses}
+              summary={summary}
+              taxes={taxes}
+              onFinalized={refetch}
+            />
+          </div>
+        </>
+      )}
     </>
   );
 }
 
-// ── Square Sales Sync button ──────────────────────────────────────────────────
-function SyncSquareSalesButton({ eventId, squareLocationId, onSynced }: { eventId: string; squareLocationId?: string | null; onSynced: () => void }) {
+// ── POS Sales Sync button ─────────────────────────────────────────────────────
+function SyncSalesButton({ eventId, posLocationId, onSynced }: { eventId: string; posLocationId?: string | null; onSynced: () => void }) {
   const SYNC = gql`
-    mutation SyncSquareSales($eventId: ID!) {
-      syncSquareSales(eventId: $eventId) { success message unmatchedCount }
+    mutation SyncSales($eventId: ID!) {
+      syncSales(eventId: $eventId) { success message unmatchedCount }
     }
   `;
   const [sync] = useMutation(SYNC);
   const [syncing, setSyncing] = useState(false);
 
   async function handleSync() {
-    if (!squareLocationId) {
-      showToast('No Square location linked to this event. Edit the event to add one.', 'warning', 5000);
+    if (!posLocationId) {
+      showToast('No POS location linked to this event. Edit the event to add one.', 'warning', 5000);
       return;
     }
     setSyncing(true);
     try {
       const { data } = await sync({ variables: { eventId } });
-      const result = data.syncSquareSales;
+      const result = data.syncSales;
       showToast(result.message, result.success ? 'success' : 'warning', 5000);
       if (result.success) onSynced();
     } catch (err) {
@@ -349,15 +414,50 @@ function SyncSquareSalesButton({ eventId, squareLocationId, onSynced }: { eventI
   return (
     <button className="btn-primary" onClick={handleSync} disabled={syncing}>
       {syncing && <span className="spinner" />}
-      <span><i className="fa-solid fa-arrows-rotate" /> Pull Square Sales</span>
+      <span><i className="fa-solid fa-arrows-rotate" /> Pull Sales</span>
+    </button>
+  );
+}
+
+function SyncLaborButton({ eventId, posLocationId, onSynced }: { eventId: string; posLocationId?: string | null; onSynced: () => void }) {
+  const SYNC = gql`
+    mutation SyncLabor($eventId: ID!) {
+      syncLabor(eventId: $eventId) { success message }
+    }
+  `;
+  const [sync] = useMutation(SYNC);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync() {
+    if (!posLocationId) {
+      showToast('No POS location linked to this event. Edit the event to add one.', 'warning', 5000);
+      return;
+    }
+    setSyncing(true);
+    try {
+      const { data } = await sync({ variables: { eventId } });
+      const result = data.syncLabor;
+      showToast(result.message, result.success ? 'success' : 'warning', 5000);
+      if (result.success) onSynced();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Labor sync failed', 'error');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <button className="btn-secondary" onClick={handleSync} disabled={syncing} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
+      {syncing && <span className="spinner" />}
+      <span>Pull Labor</span>
     </button>
   );
 }
 
 // ── Sales Tax section ─────────────────────────────────────────────────────────
-function TaxSection({ eventId, hasSquare, taxes, onSaved }: {
+function TaxSection({ eventId, hasPos, taxes, onSaved }: {
   eventId: string;
-  hasSquare: boolean;
+  hasPos: boolean;
   taxes: Record<string, unknown>;
   onSaved: () => void;
 }) {
@@ -414,7 +514,7 @@ function TaxSection({ eventId, hasSquare, taxes, onSaved }: {
     <div>
       <p style={{ color: 'var(--muted)', fontSize: '0.82rem', margin: '0 0 12px' }}>
         Sales tax is a pass-through you remit to the taxing authorities — it's tracked here for your records and never counted as profit.
-        {hasSquare ? ' Amounts come from your actual Square sales.' : ' Amounts are estimated from the rates below.'}
+        {hasPos ? ' Amounts come from your actual POS sales.' : ' Amounts are estimated from the rates below.'}
       </p>
 
       <div style={{ marginBottom: 14 }}>
@@ -520,7 +620,8 @@ function AdjustmentForm({ eventId, field, label, currentValue, onSaved }: { even
   );
 }
 
-function LaborSection({ eventId, companyId, laborEntries, onSaved }: { eventId: string; companyId: string; laborEntries: Array<Record<string, unknown>>; onSaved: () => void }) {
+function LaborSection({ eventId, companyId, laborEntries, laborMethod, onSaved }: { eventId: string; companyId: string; laborEntries: Array<Record<string, unknown>>; laborMethod?: string | null; onSaved: () => void }) {
+  const flatMode = laborMethod === 'flat_rate';
   const CREATE = gql`
     mutation CreateLabor($eventId: ID!, $input: LaborEntryInput!) {
       createLaborEntry(eventId: $eventId, input: $input) { id name hours wage total }
@@ -538,15 +639,22 @@ function LaborSection({ eventId, companyId, laborEntries, onSaved }: { eventId: 
   const { data: empData } = useQuery(GET_EMPLOYEES, { variables: { companyId } });
   const employees = empData?.employees ?? [];
 
-  const [form, setForm] = useState({ name: '', hours: '', wage: '' });
+  const [form, setForm] = useState({ name: '', hours: '', wage: '', flatRate: '' });
   const [saving, setSaving] = useState(false);
 
   async function addShift() {
-    if (!form.name || !form.hours || !form.wage) { showToast('Fill in name, hours, and wage', 'error'); return; }
+    if (flatMode) {
+      if (!form.name || !form.flatRate) { showToast('Fill in name and flat rate', 'error'); return; }
+    } else if (!form.name || !form.hours || !form.wage) {
+      showToast('Fill in name, hours, and wage', 'error'); return;
+    }
     setSaving(true);
     try {
-      await create({ variables: { eventId, input: { name: form.name, hours: +form.hours, wage: +form.wage } } });
-      setForm({ name: '', hours: '', wage: '' });
+      const input = flatMode
+        ? { name: form.name, flatRate: +form.flatRate }
+        : { name: form.name, hours: +form.hours, wage: +form.wage };
+      await create({ variables: { eventId, input } });
+      setForm({ name: '', hours: '', wage: '', flatRate: '' });
       showToast('Shift added', 'success');
       onSaved();
     } catch { showToast('Failed to add shift', 'error'); }
@@ -599,14 +707,23 @@ function LaborSection({ eventId, companyId, laborEntries, onSaved }: { eventId: 
           <label>Name</label>
           <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={{ width: 140 }} />
         </div>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label>Hours</label>
-          <input type="number" step="0.25" value={form.hours} onChange={e => setForm(f => ({ ...f, hours: e.target.value }))} style={{ width: 80 }} />
-        </div>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label>Wage/hr</label>
-          <input type="number" step="0.01" value={form.wage} onChange={e => setForm(f => ({ ...f, wage: e.target.value }))} style={{ width: 90 }} />
-        </div>
+        {flatMode ? (
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Flat rate / shift</label>
+            <input type="number" step="0.01" value={form.flatRate} onChange={e => setForm(f => ({ ...f, flatRate: e.target.value }))} style={{ width: 110 }} />
+          </div>
+        ) : (
+          <>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Hours</label>
+              <input type="number" step="0.25" value={form.hours} onChange={e => setForm(f => ({ ...f, hours: e.target.value }))} style={{ width: 80 }} />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Wage/hr</label>
+              <input type="number" step="0.01" value={form.wage} onChange={e => setForm(f => ({ ...f, wage: e.target.value }))} style={{ width: 90 }} />
+            </div>
+          </>
+        )}
         <button className="btn-primary" onClick={addShift} disabled={saving} style={{ marginBottom: 0 }}>
           {saving && <span className="spinner" />} <span>+ Add Shift</span>
         </button>

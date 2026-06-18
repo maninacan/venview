@@ -8,7 +8,7 @@ import { typeDefs } from './schema/typeDefs.js';
 import { resolvers } from './schema/resolvers/index.js';
 import { createContext } from './context/index.js';
 import healthRouter from './routes/health.js';
-import squareRouter from './routes/square.js';
+import posRouter from './routes/pos.js';
 import uploadsRouter from './routes/uploads.js';
 import billingRouter from './routes/billing.js';
 import logger from './lib/logger.js';
@@ -62,7 +62,7 @@ async function main() {
 
   // REST routes
   app.use('/api', healthRouter);
-  app.use('/api', squareRouter);
+  app.use('/api', posRouter);
   app.use('/api', uploadsRouter);
   app.use('/api', billingRouter);
 

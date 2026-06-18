@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <link rel="icon" href="images/favicon.ico">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Venview Event Manager - Dashboard</title>
-  <meta name="description" content="Manage your events, track expenses, and see real profit with VenView's event dashboard.">
+  <title>venOS Event Manager - Dashboard</title>
+  <meta name="description" content="Manage your events, track expenses, and see real profit with venOS's event dashboard.">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="VenView Event Manager">
-  <meta property="og:description" content="Manage your events, track expenses, and see real profit with VenView's event dashboard.">
+  <meta property="og:title" content="venOS Event Manager">
+  <meta property="og:description" content="Manage your events, track expenses, and see real profit with venOS's event dashboard.">
   <meta property="og:image" content="/images/logo.png">
   <meta property="og:url" content="https://venview.fly.dev/app.html">
   <meta name="twitter:card" content="summary_large_image">
@@ -105,9 +105,9 @@
 	<div class="app-shell">
   <header>
     <div class="brand">
-      <img src="images/venview-icon-lg.png" alt="VenView" class="brand-logo">
+      <img src="images/venview-icon-lg.png" alt="venOS" class="brand-logo">
       <div class="brand-text">
-        <span class="brand-title">VenView Events</span>
+        <span class="brand-title">venOS Events</span>
         <span class="brand-subtitle">Vendor Intelligence for Events</span>
       </div>
     </div>
@@ -151,7 +151,7 @@
   <section id="authSection" class="card">
     <div class="auth-container">
       <div class="auth-brand">
-        <span class="brand-title">Venview Events</span>
+        <span class="brand-title">venOS Events</span>
         <span class="brand-subtitle">Vendor Intelligence for Events</span>
       </div>
       <h2 id="authTitle">Sign In</h2>
@@ -565,13 +565,13 @@
     <div class="upgrade-modal" id="upgradeModal">
       <div class="modal-header">
         <button class="modal-close" onclick="closeUpgradeModal()" aria-label="Close">✕</button>
-        <div class="pro-badge">⚡ Venview Pro</div>
+        <div class="pro-badge">⚡ venOS Pro</div>
         <h2>Unlock the complete picture.</h2>
         <p>See every event's true profit, track trends over time, and make smarter decisions — faster.</p>
       </div>
       <div class="trigger-reason" id="triggerReason">
         <span class="reason-icon">🔒</span>
-        <span id="triggerReasonText">This feature requires Venview Pro.</span>
+        <span id="triggerReasonText">This feature requires venOS Pro.</span>
       </div>
       <div class="modal-body">
         <p class="features-label">Everything in Pro</p>
@@ -603,7 +603,7 @@
         </ul>
         <div class="starter-note">
           <span class="lock-icon">📋</span>
-          <span>You're on <strong>Venview Starter</strong> — includes 1 finalized event and basic profit summary.</span>
+          <span>You're on <strong>venOS Starter</strong> — includes 1 finalized event and basic profit summary.</span>
         </div>
       </div>
       <div class="modal-divider"></div>
@@ -622,7 +622,7 @@
       <!-- Section 1: Welcome -->
       <div class="welcome-header">
         <div class="welcome-badge">🧪 Beta</div>
-        <h2>Welcome to VenView Beta</h2>
+        <h2>Welcome to venOS Beta</h2>
         <p class="welcome-subtitle">You're helping us build the simplest way for event vendors to know if they actually made money.</p>
         <p class="welcome-note">This beta version is focused on one thing:<br><strong>Getting you from event → to true profit in minutes.</strong></p>
         <p class="welcome-note">Some features may evolve. Your feedback will shape the final product.</p>
@@ -649,7 +649,7 @@
           <div class="welcome-step">
             <div class="step-number">2</div>
             <h3>Connect &amp; Sync Sales</h3>
-            <p>If you use Square, connect your account. VenView will pull your real sales and tax data automatically.</p>
+            <p>If you use Square, connect your account. venOS will pull your real sales and tax data automatically.</p>
             <p>If not, enter totals manually.</p>
             <button class="btn-secondary welcome-action" onclick="closeWelcomeModal(); navigateTo('manageSection')">Sync Sales</button>
           </div>
