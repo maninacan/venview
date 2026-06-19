@@ -86,7 +86,7 @@ export function useCompanyJourney(companyId: string | null) {
     },
     {
       key: 'team', label: 'Invite your team', description: 'Share events, inventory, and recipes with teammates.',
-      ctaLabel: 'Invite team', to: `/companies/${companyId}/settings`, done: memberCount > 1, optional: true,
+      ctaLabel: 'Invite team', to: `/companies/${companyId}/settings#team-access`, done: memberCount > 1, optional: true,
     },
     {
       key: 'first-event', label: 'Create your first event', description: 'Add a market, festival, or pop-up to start tracking profit.',

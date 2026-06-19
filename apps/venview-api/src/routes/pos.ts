@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { supabase } from '../lib/supabase.js';
 import { encryptToken } from '../lib/crypto.js';
 import { getProvider } from '../lib/pos/index.js';
+import { getToastRestaurantName } from '../lib/toast.js';
 import { createContext } from '../context/index.js';
 import logger from '../lib/logger.js';
 
@@ -38,6 +39,47 @@ router.get('/pos/:provider/oauth/start', async (req: Request, res: Response) => 
   } catch (err) {
     logger.error('pos.oauth.start: error', { error: err });
     res.status(500).json({ error: 'Failed to start OAuth' });
+  }
+});
+
+// ── POST /api/pos/toast/connect ───────────────────────────────────────────────
+// Toast has no redirect OAuth: a company connects by entering its restaurant
+// GUID. Partner clientId/secret live in env vars; we store only the GUID.
+router.post('/pos/toast/connect', async (req: Request, res: Response) => {
+  try {
+    const ctx = await createContext(req);
+    if (!ctx.user) return void res.status(401).json({ error: 'Unauthorized' });
+
+    const companyId = (req.body?.companyId as string | undefined)?.trim();
+    const restaurantGuid = (req.body?.restaurantGuid as string | undefined)?.trim();
+    if (!companyId || !restaurantGuid) return void res.status(400).json({ error: 'companyId and restaurantGuid are required' });
+
+    const { data: member } = await supabase
+      .from('CompanyMembers').select('role')
+      .eq('companyId', companyId).eq('userId', ctx.user.id).eq('status', 'active').single();
+    if (!member || !['owner', 'admin'].includes((member as { role: string }).role)) {
+      return void res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Best-effort name lookup; also serves as a light validity check of the GUID.
+    const locationName = await getToastRestaurantName(restaurantGuid);
+
+    const { error: upsertErr } = await supabase.from('PosConnection').upsert({
+      companyId,
+      provider: 'toast',
+      externalId: restaurantGuid,
+      locationId: restaurantGuid,
+      locationName,
+    }, { onConflict: 'companyId,provider' });
+    if (upsertErr) {
+      logger.error('pos.toast.connect: save failed', { companyId, error: upsertErr.message });
+      return void res.status(500).json({ error: 'Failed to save Toast connection' });
+    }
+
+    res.json({ success: true, locationName });
+  } catch (err) {
+    logger.error('pos.toast.connect: error', { error: err });
+    res.status(500).json({ error: 'Failed to connect Toast' });
   }
 });
 

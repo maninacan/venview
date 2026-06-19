@@ -1,4 +1,5 @@
 import { squareProvider } from './square.js';
+import { toastProvider } from './toast.js';
 import { PosUnsupportedError, type PosProvider, type PosProviderKey, type PosCapabilities } from './types.js';
 
 export * from './types.js';
@@ -21,7 +22,7 @@ function stub(key: PosProviderKey, displayName: string, capabilities: PosCapabil
 const REGISTRY: Record<PosProviderKey, PosProvider> = {
   square: squareProvider,
   shopify: stub('shopify', 'Shopify', { sales: true, labor: false, catalog: true }),
-  toast: stub('toast', 'Toast', { sales: true, labor: true, catalog: true }),
+  toast: toastProvider,
 };
 
 export function getProvider(key: string | null | undefined): PosProvider {

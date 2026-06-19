@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
@@ -29,11 +29,6 @@ const REMOVE_MEMBER = gql`
 const LEAVE = gql`
   mutation LeaveCompany($companyId: ID!) {
     leaveCompany(companyId: $companyId)
-  }
-`;
-const REQUEST_ACCESS = gql`
-  mutation RequestAccess($joinCode: String!) {
-    requestAccess(joinCode: $joinCode) { companyName status }
   }
 `;
 const APPROVE_MEMBER = gql`
@@ -86,17 +81,17 @@ interface PosMeta { displayName: string; blurb: string; implemented: boolean; }
 const POS_META: Record<string, PosMeta> = {
   square: { displayName: 'Square', blurb: 'Sync sales, locations & labor automatically', implemented: true },
   shopify: { displayName: 'Shopify', blurb: 'Sync sales automatically', implemented: false },
-  toast: { displayName: 'Toast', blurb: 'Sync sales & labor automatically', implemented: false },
+  toast: { displayName: 'Toast', blurb: 'Sync sales & labor automatically', implemented: true },
 };
 
 export function SettingsPage() {
   const { companyId, company } = useCurrentCompany();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [updateCompany] = useMutation(UPDATE_COMPANY);
   const [removeMember] = useMutation(REMOVE_MEMBER);
   const [leaveCompany] = useMutation(LEAVE);
-  const [requestAccess] = useMutation(REQUEST_ACCESS);
   const [approveMember] = useMutation(APPROVE_MEMBER);
   const [inviteMember] = useMutation(INVITE_MEMBER);
   const [offerOwnership] = useMutation(OFFER_OWNERSHIP);
@@ -116,8 +111,7 @@ export function SettingsPage() {
   const [companyForm, setCompanyForm] = useState({ name: '', phone: '', contactName: '', vendorCategory: '', email: '' });
   const [savingCompany, setSavingCompany] = useState(false);
   const [connectingPos, setConnectingPos] = useState(false);
-  const [joinCode, setJoinCode] = useState('');
-  const [joiningCode, setJoiningCode] = useState(false);
+  const [toastGuid, setToastGuid] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [inviteCooldown, setInviteCooldown] = useState(0);
@@ -153,6 +147,13 @@ export function SettingsPage() {
     });
   }, [info]);
 
+  // Scroll to an anchored section (e.g. #team-access) once content has rendered
+  useEffect(() => {
+    if (loading || !location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [loading, location.hash]);
+
   // Handle post-OAuth redirect
   useEffect(() => {
     const pos = searchParams.get('pos');
@@ -181,6 +182,33 @@ export function SettingsPage() {
       window.location.href = result.url;
     } catch (err) {
       showToast(err instanceof Error ? err.message : `Failed to connect ${posMeta.displayName}`, 'error');
+      setConnectingPos(false);
+    }
+  }
+
+  // Toast connects by entering a restaurant GUID (client-credentials model),
+  // not a redirect OAuth flow like Square.
+  async function handleConnectToast() {
+    if (!toastGuid.trim()) return;
+    setConnectingPos(true);
+    try {
+      const { supabase } = await import('@org/data');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch(`${API_URL}/api/pos/toast/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ companyId, restaurantGuid: toastGuid.trim() }),
+      });
+      const result = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !result.success) throw new Error(result.error ?? 'Failed to connect Toast');
+      showToast('Toast connected.', 'success');
+      setToastGuid('');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to connect Toast', 'error');
+    } finally {
       setConnectingPos(false);
     }
   }
@@ -248,23 +276,6 @@ export function SettingsPage() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to remove member', 'error');
     }
-  }
-
-  async function handleJoinCode() {
-    if (!joinCode.trim()) return;
-    setJoiningCode(true);
-    try {
-      const { data: result } = await requestAccess({ variables: { joinCode: joinCode.trim().toUpperCase() } });
-      const { companyName, status } = result.requestAccess;
-      if (status === 'active') {
-        showToast(`You're already a member of ${companyName}.`, 'info');
-      } else {
-        showToast(`Access requested for ${companyName} — pending owner approval.`, 'success', 6000);
-      }
-      setJoinCode('');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Invalid join code', 'error');
-    } finally { setJoiningCode(false); }
   }
 
   async function handleInvite() {
@@ -432,6 +443,25 @@ export function SettingsPage() {
                 Disconnect {posMeta.displayName}
               </button>
             </div>
+          ) : provider === 'toast' ? (
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.8rem' }}>Toast Restaurant GUID</label>
+                <input
+                  type="text"
+                  value={toastGuid}
+                  onChange={e => setToastGuid(e.target.value)}
+                  placeholder="e.g. 1a2b3c4d-…"
+                  style={{ width: 280 }}
+                />
+              </div>
+              <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleConnectToast} disabled={connectingPos || !toastGuid.trim()}>
+                {connectingPos && <span className="spinner" />} <span>Connect Toast</span>
+              </button>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0', flexBasis: '100%' }}>
+                Find your restaurant GUID in Toast Web under Integrations, then paste it here to sync sales and labor.
+              </p>
+            </div>
           ) : posMeta.implemented ? (
             <div style={{ marginTop: 14 }}>
               <button className="btn-primary" onClick={handleConnectPos} disabled={connectingPos}>
@@ -527,7 +557,7 @@ export function SettingsPage() {
       </div>
 
       {/* Team Access */}
-      <div className="card">
+      <div id="team-access" className="card" style={{ scrollMarginTop: 16 }}>
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Team Access</p>
         <p style={{ fontSize: '0.84rem', color: 'var(--muted)', margin: '0 0 16px' }}>
           Share events, inventory, and recipes with your team. Everyone in the same company sees the same data.
@@ -621,17 +651,6 @@ export function SettingsPage() {
             </table>
           </div>
         )}
-
-        {/* Request access via join code */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.8rem' }}>Request access via join code</label>
-            <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter join code" style={{ width: 180, textTransform: 'uppercase' }} />
-          </div>
-          <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleJoinCode} disabled={joiningCode}>
-            {joiningCode && <span className="spinner" />} <span>Request Access</span>
-          </button>
-        </div>
       </div>
 
       {/* Plan info */}
