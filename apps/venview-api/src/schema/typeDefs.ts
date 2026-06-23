@@ -103,7 +103,7 @@ export const typeDefs = `#graphql
   type EventDay {
     id: ID!
     dayNumber: Int!
-    eventDate: String
+    date: String
     startTime: String
     endTime: String
   }

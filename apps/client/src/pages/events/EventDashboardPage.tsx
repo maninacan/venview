@@ -287,8 +287,6 @@ export function EventDashboardPage() {
             {salesSourceButtons}
             <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary"><i className="fa-solid fa-pen-to-square" /> Edit Event</Link>
             <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary"><i className="fa-solid fa-chart-bar" /> Post-Event Report</Link>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-[#f1f5f9] mt-0.5">
             <button className="btn-danger-subtle" onClick={handleDelete}><i className="fa-solid fa-trash" /> Delete Event</button>
           </div>
         </div>
