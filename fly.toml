@@ -7,7 +7,7 @@ app = 'venview'
 primary_region = 'sjc'
 
 [env]
-  DOPPLER_CONFIG = 'production'
+  DOPPLER_CONFIG = 'prd'
   DOPPLER_PROJECT = 'venview'
 
 [[mounts]]
