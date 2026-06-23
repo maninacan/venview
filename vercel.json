@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npx nx build client --configuration=production",
+  "outputDirectory": "apps/client/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
