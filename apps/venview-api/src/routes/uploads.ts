@@ -155,7 +155,7 @@ function sleep(ms: number): Promise<void> {
 // also sniff the error payload's type rather than relying on the HTTP status.
 function isTransientAnthropicError(err: unknown): boolean {
   if (err instanceof Anthropic.APIError) {
-    const status = (err as Anthropic.APIError).status;
+    const status = err.status;
     if (status === 408 || status === 409 || status === 429) return true;
     if (typeof status === 'number' && status >= 500) return true;
   }
