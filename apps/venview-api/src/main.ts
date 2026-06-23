@@ -10,11 +10,8 @@ import { createContext } from './context/index.js';
 import healthRouter from './routes/health.js';
 import squareRouter from './routes/square.js';
 import uploadsRouter from './routes/uploads.js';
-<<<<<<< HEAD
 import logger from './lib/logger.js';
-=======
 import billingRouter from './routes/billing.js';
->>>>>>> 6ffbca083806b691ee370dc019cb2db527ffd699
 
 const host = process.env['HOST'] ?? 'localhost';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 3000;
