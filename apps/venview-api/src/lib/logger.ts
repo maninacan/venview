@@ -21,12 +21,13 @@ const logger = createLogger({
   ],
 });
 
-if (process.env['NODE_ENV'] !== 'production') {
-  logger.add(
-    new transports.Console({
-      format: format.combine(format.colorize(), format.simple()),
-    })
-  );
-}
+// Always log to console so fly logs captures output in all environments
+logger.add(
+  new transports.Console({
+    format: process.env['NODE_ENV'] === 'production'
+      ? format.combine(format.timestamp(), format.json())
+      : format.combine(format.colorize(), format.simple()),
+  })
+);
 
 export default logger;
