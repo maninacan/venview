@@ -102,7 +102,7 @@ export const adminResolvers = {
         supabase.from('Companies').select('id, plan, createdAt'),
         supabase.auth.admin.listUsers({ perPage: 1000 }),
         supabase.from('EventInfo').select('eventID, companyId, isFinalized, eventDate, finalizedDate, zipCode'),
-        supabase.from('SquareConnection').select('companyId'),
+        supabase.from('PosConnection').select('companyId'),
         supabase.from('SalesSummary').select('eventID, netProfit'),
       ]);
 

@@ -2,6 +2,7 @@ import type { AppContext } from '../../context/index.js';
 import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
 import { computeProfit } from '../../lib/profit.js';
+import { applyTaxRates } from './sales.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ async function buildEventReport(eventId: string) {
   if (!event) return null;
 
   const ev = event as Record<string, unknown>;
-  const hasSquare = !!ev['squareLocationId'];
+  const hasSquare = !!ev['posLocationId'];
   const taxRate = Number((sales as Record<string, unknown> | null)?.['taxRate'] ?? 0);
 
   // COGS = sum of InventorySales totalCost (recipe-matched costs)
@@ -76,11 +77,32 @@ async function buildEventReport(eventId: string) {
         (s: number, r: Record<string, unknown>) => s + Number(r['total'] ?? 0), 0
       ),
     },
-    taxes: {
-      stateRate: taxRate,
-      stateFoodTax: summary.stateFoodTax,
-      taxDetail: null,
-    },
+    taxes: (() => {
+      const sr = sales as Record<string, unknown> | null;
+      const stateRate = Number(sr?.['stateTaxRate'] ?? 0);
+      const localRate = Number(sr?.['localTaxRate'] ?? 0);
+      const combinedRate = Number(sr?.['taxRate'] ?? 0) || (stateRate + localRate);
+      const taxBase = Number(sr?.['totalCollected'] ?? 0) || Number(sr?.['netSales'] ?? 0);
+      // Square actuals are the truth when synced; otherwise compute rate × base.
+      const taxCollected = ev['posLocationId']
+        ? Number(sr?.['taxCollected'] ?? 0)
+        : +(taxBase * combinedRate).toFixed(2);
+      const split = stateRate + localRate > 0 ? stateRate / (stateRate + localRate) : 0;
+      const stateTax = +(taxCollected * split).toFixed(2);
+      const localTax = +(taxCollected - stateTax).toFixed(2);
+      return {
+        stateRate,
+        localRate,
+        combinedRate,
+        stateTax,
+        localTax,
+        taxCollected,
+        jurisdiction: sr?.['taxJurisdiction'] ?? null,
+        // legacy aliases retained for safety
+        stateFoodTax: taxCollected,
+        taxDetail: sr?.['taxJurisdiction'] ?? null,
+      };
+    })(),
     summary,
     inventorySales: (inventorySales ?? []).map((r: Record<string, unknown>) => ({
       name: r['name'],
@@ -104,8 +126,8 @@ async function buildEventReport(eventId: string) {
 // Strip DB-only columns not in the GraphQL Event type
 const EVENT_SCHEMA_FIELDS = new Set([
   'id', 'companyId', 'eventName', 'eventDate', 'endDate', 'status', 'eventType',
-  'eventHost', 'eventLocation', 'coordinator', 'notes', 'zipCode', 'squareLocationId',
-  'time', 'applicationDate', 'eventRating', 'customFields', 'numDays',
+  'eventHost', 'eventLocation', 'coordinator', 'notes', 'zipCode', 'posLocationId',
+  'time', 'applicationDate', 'eventRating', 'permits', 'employees', 'customFields', 'numDays',
   'isFinalized', 'finalizedDate', 'days', 'netProfit',
   // joined sub-objects used for inline computation (stripped below)
   'SalesSummary', 'EventExpenses', 'EventDays',
@@ -150,7 +172,7 @@ export const eventResolvers = {
       return (data ?? []).map((row: Record<string, unknown>) => {
         const sales = (row['SalesSummary'] as Record<string, unknown> | null) ?? {};
         const exp = (row['EventExpenses'] as Record<string, unknown> | null) ?? {};
-        const hasSquare = !!row['squareLocationId'];
+        const hasSquare = !!row['posLocationId'];
         const posFees = Number(exp['posFee'] ?? 0) || (hasSquare ? Number(sales['squareFees'] ?? 0) : 0);
         const netSales = Number(sales['netSales'] ?? row['grossSales'] ?? 0);
         const netProfit = netSales
@@ -196,7 +218,7 @@ export const eventResolvers = {
 
       const { data } = await supabase
         .from('EventInfo')
-        .select('isFinalized, SalesSummary(grossSales, netSales, squareFees), EventExpenses(*), squareLocationId')
+        .select('isFinalized, SalesSummary(grossSales, netSales, squareFees), EventExpenses(*), posLocationId')
         .eq('companyId', companyId);
 
       const rows = (data ?? []) as Array<Record<string, unknown>>;
@@ -225,14 +247,14 @@ export const eventResolvers = {
 
       const { data } = await supabase
         .from('EventInfo')
-        .select('eventID, eventName, eventDate, squareLocationId, SalesSummary(*), EventExpenses(*)')
+        .select('eventID, eventName, eventDate, posLocationId, SalesSummary(*), EventExpenses(*)')
         .eq('companyId', companyId)
         .order('eventDate', { ascending: true });
 
       return (data ?? []).map((r: Record<string, unknown>) => {
         const s = (r['SalesSummary'] as Record<string, unknown> | null) ?? {};
         const exp = (r['EventExpenses'] as Record<string, unknown> | null) ?? {};
-        const hasSquare = !!r['squareLocationId'];
+        const hasSquare = !!r['posLocationId'];
         const posFees = Number(exp['posFee'] ?? 0) || (hasSquare ? Number(s['squareFees'] ?? 0) : 0);
         const netSales = Number(s['netSales'] ?? 0);
         const netProfit = netSales
@@ -285,6 +307,9 @@ export const eventResolvers = {
         );
       }
 
+      // Best-effort: auto-look-up sales tax rates from the event ZIP.
+      await applyTaxRates(eventID).catch(() => undefined);
+
       return rowToEvent(event as Record<string, unknown>);
     },
 
@@ -315,6 +340,9 @@ export const eventResolvers = {
           );
         }
       }
+
+      // Re-look-up tax rates when the event ZIP changes (best-effort).
+      if ('zipCode' in eventFields) await applyTaxRates(id).catch(() => undefined);
 
       return rowToEvent(data as Record<string, unknown>);
     },

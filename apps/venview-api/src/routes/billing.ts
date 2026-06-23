@@ -82,6 +82,14 @@ router.post('/billing/checkout', async (req: Request, res: Response) => {
     const companyId = company['id'] as string;
     const customerId = await ensureStripeCustomer(company);
 
+    // Guard against duplicate subscriptions: if one is already active, mirror it
+    // and send them to manage it instead of charging a second time.
+    const existing = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+    if (existing.data.some(s => s.status === 'active' || s.status === 'trialing')) {
+      await reconcileFromStripe(customerId);
+      return void res.status(409).json({ error: 'You already have an active Pro subscription.' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
@@ -121,6 +129,59 @@ router.post('/billing/portal', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Billing portal error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to open billing portal' });
+  }
+});
+
+// Pull the customer's live subscription state from Stripe and mirror it onto
+// the company. Self-heal path for when a webhook event was never delivered.
+async function reconcileFromStripe(customerId: string): Promise<void> {
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+  const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+  if (activeSub) {
+    await syncSubscription(activeSub);
+  } else if (subs.data.length > 0) {
+    await clearSubscription(subs.data[0]);
+  }
+}
+
+// ── POST /api/billing/refresh ────────────────────────────────────────────────
+// Any active member can trigger a reconcile from Stripe (used on return from
+// Checkout so the plan reflects immediately even if the webhook was missed).
+router.post('/billing/refresh', async (req: Request, res: Response) => {
+  try {
+    const ctx = await createContext(req);
+    if (!ctx.user) return void res.status(401).json({ error: 'Unauthorized' });
+
+    const companyId = (req.body as { companyId?: string })?.companyId;
+    if (!companyId) return void res.status(400).json({ error: 'companyId required' });
+
+    const { data: member } = await supabase
+      .from('CompanyMembers')
+      .select('role')
+      .eq('companyId', companyId)
+      .eq('userId', ctx.user.id)
+      .eq('status', 'active')
+      .single();
+    if (!member) return void res.status(403).json({ error: 'Forbidden' });
+
+    const { data: company } = await supabase
+      .from('Companies')
+      .select('stripeCustomerId')
+      .eq('id', companyId)
+      .single();
+    const customerId = (company as Record<string, unknown> | null)?.['stripeCustomerId'] as string | null;
+    if (customerId) await reconcileFromStripe(customerId);
+
+    const { data: updated } = await supabase
+      .from('Companies')
+      .select('plan, subscriptionStatus, currentPeriodEnd')
+      .eq('id', companyId)
+      .single();
+
+    res.json({ ok: true, ...(updated as object) });
+  } catch (err) {
+    console.error('Billing refresh error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to refresh billing' });
   }
 });
 

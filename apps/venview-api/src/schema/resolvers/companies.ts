@@ -2,6 +2,8 @@ import { randomBytes } from 'crypto';
 import type { AppContext } from '../../context/index.js';
 import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
+import { encryptToken } from '../../lib/crypto.js';
+import { verifyTaxjarToken } from '../../lib/taxRates.js';
 
 function generateJoinCode(): string {
   return randomBytes(3).toString('hex').toUpperCase().slice(0, 6);
@@ -238,6 +240,58 @@ export const companyResolvers = {
       return { email: normalized, status: invited ? 'invited' : 'added' };
     },
 
+    // Save onboarding answers (POS choice + labor method). Any active member can set.
+    setCompanyProfile: async (
+      _: unknown,
+      { companyId, posSystem, laborMethod }: { companyId: string; posSystem?: string | null; laborMethod?: string | null },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user.id);
+
+      const patch: Record<string, unknown> = {};
+      if (posSystem !== undefined) patch['posSystem'] = posSystem;
+      if (laborMethod !== undefined) patch['laborMethod'] = laborMethod;
+
+      const { data, error } = await supabase
+        .from('Companies')
+        .update(patch)
+        .eq('id', companyId)
+        .select()
+        .single();
+      if (error || !data) throw new Error(error?.message ?? 'Failed to save company profile');
+      return data;
+    },
+
+    // Store the company's own TaxJar API token, encrypted at rest (owner only).
+    setTaxjarToken: async (
+      _: unknown,
+      { companyId, token }: { companyId: string; token: string },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      const membership = await requireCompanyMember(companyId, ctx.user.id);
+      if (membership.role !== 'owner') throw new Error('Only the owner can manage integrations');
+      const trimmed = token.trim();
+      if (!trimmed) throw new Error('Token required');
+
+      // Verify before storing so a bad token is rejected immediately.
+      const check = await verifyTaxjarToken(trimmed);
+      if (check === 'invalid') throw new Error('That TaxJar API token was rejected. Double-check it in app.taxjar.com → Account → API Access.');
+      if (check === 'unreachable') throw new Error('Could not reach TaxJar to verify the token. Please try again in a moment.');
+
+      await supabase.from('Companies').update({ taxjarToken: encryptToken(trimmed) }).eq('id', companyId);
+      return true;
+    },
+
+    removeTaxjarToken: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+      const membership = await requireCompanyMember(companyId, ctx.user.id);
+      if (membership.role !== 'owner') throw new Error('Only the owner can manage integrations');
+      await supabase.from('Companies').update({ taxjarToken: null }).eq('id', companyId);
+      return true;
+    },
+
     leaveCompany: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
       requireAuth(ctx);
       const membership = await requireCompanyMember(companyId, ctx.user.id);
@@ -344,6 +398,9 @@ export const companyResolvers = {
   },
 
   Company: {
+    // Whether a TaxJar token is stored — never expose the token itself.
+    taxjarConnected: (company: Record<string, unknown>) => !!company['taxjarToken'],
+
     members: async (company: Record<string, unknown>) => {
       return membersByStatus(company['id'] as string, 'active');
     },
@@ -352,18 +409,24 @@ export const companyResolvers = {
       return membersByStatus(company['id'] as string, 'pending');
     },
 
-    squareStatus: async (company: Record<string, unknown>) => {
+    posStatus: async (company: Record<string, unknown>) => {
+      const provider = (company['posSystem'] as string | null) ?? null;
+      // Only 'manual'/unset means definitively no provider; otherwise look up the connection.
       const { data } = await supabase
-        .from('SquareConnection')
-        .select('locationId, locationName')
+        .from('PosConnection')
+        .select('provider, locationId, locationName')
         .eq('companyId', company['id'])
-        .single();
+        .order('createdAt', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (!data) return { connected: false };
+      if (!data) return { connected: false, provider };
+      const row = data as Record<string, unknown>;
       return {
         connected: true,
-        locationId: (data as Record<string, unknown>)['locationId'],
-        locationName: (data as Record<string, unknown>)['locationName'],
+        provider: (row['provider'] as string) ?? provider,
+        locationId: row['locationId'],
+        locationName: row['locationName'],
       };
     },
   },

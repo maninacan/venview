@@ -8,10 +8,10 @@ import { typeDefs } from './schema/typeDefs.js';
 import { resolvers } from './schema/resolvers/index.js';
 import { createContext } from './context/index.js';
 import healthRouter from './routes/health.js';
-import squareRouter from './routes/square.js';
+import posRouter from './routes/pos.js';
 import uploadsRouter from './routes/uploads.js';
-import logger from './lib/logger.js';
 import billingRouter from './routes/billing.js';
+import logger from './lib/logger.js';
 
 const host = process.env['HOST'] ?? 'localhost';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 3000;
@@ -62,7 +62,7 @@ async function main() {
 
   // REST routes
   app.use('/api', healthRouter);
-  app.use('/api', squareRouter);
+  app.use('/api', posRouter);
   app.use('/api', uploadsRouter);
   app.use('/api', billingRouter);
 

@@ -9,7 +9,7 @@ const GET_REPORT = gql`
     eventReport(id: $id) {
       event {
         id eventName eventDate endDate numDays isFinalized finalizedDate
-        squareLocationId status eventType eventHost eventLocation
+        posLocationId status eventType eventHost eventLocation
         coordinator time eventRating applicationDate notes customFields
       }
       sales {
@@ -20,7 +20,7 @@ const GET_REPORT = gql`
         healthDeptFee eventFee mileage mileageRate coordinatorFee
         posFee employeeBonus eventRunnerFees laborFees additionalFees
       }
-      taxes { stateRate stateFoodTax taxDetail }
+      taxes { stateRate localRate stateTax localTax taxCollected jurisdiction }
       summary {
         posFees cogs grossProfit totalExpenses netProfit
         tips stateFoodTax laborFees additionalFeesTotal mileageReimbursement
@@ -87,8 +87,21 @@ export function PostEventReportPage() {
     if (!report) return;
     try {
       const pdfMake = (await import('pdfmake/build/pdfmake')).default;
-      const pdfFonts = (await import('pdfmake/build/vfs_fonts')).default;
-      pdfMake.vfs = pdfFonts.pdfMake.vfs;
+      // pdfmake 0.3.x exports the vfs object directly; older builds nest it
+      // under `.pdfMake.vfs`. Support both so fonts always resolve.
+      const vfsModule = await import('pdfmake/build/vfs_fonts') as unknown as {
+        default?: { pdfMake?: { vfs?: Record<string, string> }; vfs?: Record<string, string> } | Record<string, string>;
+        pdfMake?: { vfs?: Record<string, string> };
+        vfs?: Record<string, string>;
+      };
+      const d = vfsModule.default as { pdfMake?: { vfs?: Record<string, string> }; vfs?: Record<string, string> } & Record<string, string> | undefined;
+      const vfs =
+        d?.pdfMake?.vfs ??
+        d?.vfs ??
+        (d && typeof d === 'object' && !('pdfMake' in d) && !('vfs' in d) ? (d as Record<string, string>) : undefined) ??
+        vfsModule.pdfMake?.vfs ??
+        vfsModule.vfs;
+      pdfMake.vfs = vfs as Record<string, string>;
 
       const netProfit = Number(summary.netProfit ?? 0);
       const profitColor = netProfit >= 0 ? '#166534' : '#991b1b';
@@ -196,7 +209,9 @@ export function PostEventReportPage() {
       content.push(buildTable([
         ['', ''],
         ['Tips (pass-through to staff)', fmt(summary.tips)],
-        [`Sales Tax Collected (${(Number(taxes.stateRate ?? 0) * 100).toFixed(2)}%)`, fmt(summary.stateFoodTax)],
+        [`Sales tax — ${taxes.jurisdiction?.state ?? 'State'} (${(Number(taxes.stateRate ?? 0) * 100).toFixed(2)}%)`, fmt(Number(taxes.stateTax ?? 0))],
+        [`Sales tax — ${taxes.jurisdiction?.city ?? taxes.jurisdiction?.county ?? 'Local'} (${(Number(taxes.localRate ?? 0) * 100).toFixed(2)}%)`, fmt(Number(taxes.localTax ?? 0))],
+        ['Total sales tax collected (to remit)', fmt(Number(taxes.taxCollected ?? 0))],
       ]));
 
       const docDef = {
@@ -227,6 +242,11 @@ export function PostEventReportPage() {
 
   const netProfit = Number(summary.netProfit ?? 0);
   const stateRate = Number(taxes.stateRate ?? 0);
+  const localRate = Number(taxes.localRate ?? 0);
+  const stateTax = Number(taxes.stateTax ?? 0);
+  const localTax = Number(taxes.localTax ?? 0);
+  const taxCollected = Number(taxes.taxCollected ?? 0);
+  const jur = taxes.jurisdiction ?? null;
 
   return (
     <>
@@ -377,10 +397,9 @@ export function PostEventReportPage() {
         {/* For your records */}
         <SectionHeader title="For Your Records (Informational)" />
         <Row label="Tips (pass-through to staff)" value={fmt(summary.tips)} />
-        <Row
-          label={`Sales Tax Collected — Remit to State (${(stateRate * 100).toFixed(2)}%)`}
-          value={fmt(summary.stateFoodTax)}
-        />
+        <Row label={`Sales tax — remit to ${jur?.state ?? 'State'} (${(stateRate * 100).toFixed(2)}%)`} value={fmt(stateTax)} />
+        <Row label={`Sales tax — remit to ${jur?.city ?? jur?.county ?? 'Local'} (${(localRate * 100).toFixed(2)}%)`} value={fmt(localTax)} />
+        <Row label="Total sales tax collected (to remit)" value={fmt(taxCollected)} />
         <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: 8 }}>
           ⓘ Income taxes are calculated annually — consult your accountant.
         </p>

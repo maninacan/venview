@@ -1,9 +1,8 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { CompanyCard, CompanyCardSkeleton } from '../../components/companies/CompanyCard';
-import { WelcomeModal } from '../../components/modals/WelcomeModal';
 import { showToast } from '@org/data';
 
 const GET_MY_COMPANIES = gql`
@@ -31,21 +30,8 @@ export function CompaniesPage() {
 
   const { data, loading, refetch } = useQuery(GET_MY_COMPANIES);
   const [requestAccess] = useMutation(REQUEST_ACCESS);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [firstCompanyId, setFirstCompanyId] = useState('');
 
   const companies = data?.me?.companies ?? [];
-
-  // Show welcome modal on first login (per-user localStorage flag)
-  useEffect(() => {
-    if (!data?.me?.id) return;
-    const key = `venview_welcome_seen_${data.me.id}`;
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, 'true');
-      setShowWelcome(true);
-      if (companies.length > 0) setFirstCompanyId(companies[0].id);
-    }
-  }, [data?.me?.id, companies.length]); // eslint-disable-line
 
   async function handleJoin(e: FormEvent) {
     e.preventDefault();
@@ -116,13 +102,6 @@ export function CompaniesPage() {
           </form>
         )}
       </div>
-
-      {showWelcome && (
-        <WelcomeModal
-          companyId={firstCompanyId || (companies[0]?.id ?? '')}
-          onClose={() => setShowWelcome(false)}
-        />
-      )}
     </>
   );
 }

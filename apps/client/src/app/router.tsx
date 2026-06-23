@@ -9,10 +9,10 @@ import { PostEventReportPage } from '../pages/events/PostEventReportPage';
 import { InventoryPage } from '../pages/inventory/InventoryPage';
 import { RecipesPage } from '../pages/recipes/RecipesPage';
 import { RestockPage } from '../pages/restock/RestockPage';
-import { FormBuilderPage } from '../pages/form-builder/FormBuilderPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
 import { BillingPage } from '../pages/billing/BillingPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
+import { HomePage } from '../pages/home/HomePage';
 import { CompanyLayout, RootLayout } from '../components/layout/Layout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ErrorElement } from '../components/layout/ErrorElement';
@@ -38,7 +38,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute><CompanyLayout /></ProtectedRoute>,
     errorElement: <ErrorElement />,
     children: [
-      { index: true, element: <Navigate to="events" replace /> },
+      { index: true, element: <HomePage /> },
       { path: 'events', element: <EventsPage /> },
       { path: 'events/new', element: <AddEventPage /> },
       { path: 'events/:eventId', element: <EventDashboardPage />, errorElement: <ErrorElement /> },
@@ -47,7 +47,6 @@ export const router = createBrowserRouter([
       { path: 'inventory', element: <InventoryPage /> },
       { path: 'recipes', element: <RecipesPage /> },
       { path: 'restock', element: <RestockPage /> },
-      { path: 'form-builder', element: <FormBuilderPage /> },
       { path: 'settings', element: <SettingsPage />, errorElement: <ErrorElement /> },
       { path: 'billing', element: <BillingPage />, errorElement: <ErrorElement /> },
     ],

@@ -250,14 +250,20 @@ router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, r
         if (chunk) chunks.push(chunk);
       }
 
-      // Map keyed by recipe name; on conflict keep the entry with more ingredients
+      // Map keyed by recipe name; on conflict keep the entry with more ingredients.
+      // (Map writes are safe without locking — Node runs this single-threaded.)
       const recipeMap = new Map<string, RecipeData>();
 
-      for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
-        res.write(`Processing section ${chunkIdx + 1} of ${chunks.length}...\n`);
+      // Process chunks concurrently (capped) so wall-clock ≈ slowest batch
+      // rather than the sum of every chunk's latency.
+      const CHUNK_CONCURRENCY = 4;
+      res.write(`Processing ${chunks.length} sections...\n`);
+      let completed = 0;
+
+      async function processChunk(chunkIdx: number) {
         try {
           const rawText = await extractTextWithRetry(anthropic, {
-            model: 'claude-opus-4-8',
+            model: 'claude-sonnet-4-6',
             max_tokens: 32000,
             system: RECIPE_EXTRACT_PROMPT,
             messages: [{ role: 'user', content: chunks[chunkIdx] }],
@@ -265,6 +271,7 @@ router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, r
           const cleaned = rawText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
           const jStart = cleaned.indexOf('{');
           const jEnd = cleaned.lastIndexOf('}');
+          let found = 0;
           if (jStart >= 0 && jEnd > jStart) {
             const parsed = JSON.parse(cleaned.slice(jStart, jEnd + 1)) as { recipes?: RecipeData[] };
             for (const r of parsed.recipes ?? []) {
@@ -274,20 +281,33 @@ router.post('/uploads/recipes-ai', upload.single('file'), async (req: Request, r
                 recipeMap.set(key, r);
               }
             }
-            res.write(`  Found ${(parsed.recipes ?? []).length} recipes.\n`);
+            found = (parsed.recipes ?? []).length;
           }
+          res.write(`  Section ${chunkIdx + 1}: found ${found} recipes (${++completed}/${chunks.length}).\n`);
         } catch (chunkErr) {
           console.error(`Chunk ${chunkIdx + 1} error:`, chunkErr);
-          res.write(`  Warning: could not fully process section ${chunkIdx + 1}.\n`);
+          res.write(`  Warning: could not fully process section ${chunkIdx + 1} (${++completed}/${chunks.length}).\n`);
         }
       }
+
+      // Worker pool over a shared index queue.
+      const queue = chunks.map((_, i) => i);
+      await Promise.all(
+        Array.from({ length: Math.min(CHUNK_CONCURRENCY, chunks.length) }, async () => {
+          let idx: number | undefined;
+          while ((idx = queue.shift()) !== undefined) {
+            await processChunk(idx);
+          }
+        })
+      );
 
       const allRecipes = Array.from(recipeMap.values());
       res.write(`\nDone — ${allRecipes.length} recipes extracted.\n\n`);
       res.write(JSON.stringify({ recipes: allRecipes }));
     } else {
       await streamTextToResponse(anthropic, {
-        model: 'claude-opus-4-8',
+        // Opus for images (vision-heavy); Sonnet for text/csv/pdf (faster).
+        model: isImage ? 'claude-opus-4-8' : 'claude-sonnet-4-6',
         max_tokens: 32000,
         system: RECIPE_EXTRACT_PROMPT,
         messages: [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
@@ -355,14 +375,19 @@ router.post('/uploads/inventory-ai', upload.single('file'), async (req: Request,
         if (chunk) chunks.push(chunk);
       }
 
-      // Map keyed by item name; last write wins (later chunk overlap refines)
+      // Map keyed by item name; last write wins (later chunk overlap refines).
+      // (Map writes are safe without locking — Node runs this single-threaded.)
       const itemMap = new Map<string, ItemData>();
 
-      for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
-        res.write(`Processing section ${chunkIdx + 1} of ${chunks.length}...\n`);
+      // Process chunks concurrently (capped) so wall-clock ≈ slowest batch.
+      const CHUNK_CONCURRENCY = 4;
+      res.write(`Processing ${chunks.length} sections...\n`);
+      let completed = 0;
+
+      async function processChunk(chunkIdx: number) {
         try {
           const rawText = await extractTextWithRetry(anthropic, {
-            model: 'claude-opus-4-8',
+            model: 'claude-sonnet-4-6',
             max_tokens: 32000,
             system: INVENTORY_EXTRACT_PROMPT,
             messages: [{ role: 'user', content: chunks[chunkIdx] }],
@@ -370,25 +395,39 @@ router.post('/uploads/inventory-ai', upload.single('file'), async (req: Request,
           const cleaned = rawText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
           const jStart = cleaned.indexOf('{');
           const jEnd = cleaned.lastIndexOf('}');
+          let found = 0;
           if (jStart >= 0 && jEnd > jStart) {
             const parsed = JSON.parse(cleaned.slice(jStart, jEnd + 1)) as { items?: ItemData[] };
             for (const it of parsed.items ?? []) {
               itemMap.set(it.name.toLowerCase().trim(), it);
             }
-            res.write(`  Found ${(parsed.items ?? []).length} items.\n`);
+            found = (parsed.items ?? []).length;
           }
+          res.write(`  Section ${chunkIdx + 1}: found ${found} items (${++completed}/${chunks.length}).\n`);
         } catch (chunkErr) {
           console.error(`Chunk ${chunkIdx + 1} error:`, chunkErr);
-          res.write(`  Warning: could not fully process section ${chunkIdx + 1}.\n`);
+          res.write(`  Warning: could not fully process section ${chunkIdx + 1} (${++completed}/${chunks.length}).\n`);
         }
       }
+
+      // Worker pool over a shared index queue.
+      const queue = chunks.map((_, i) => i);
+      await Promise.all(
+        Array.from({ length: Math.min(CHUNK_CONCURRENCY, chunks.length) }, async () => {
+          let idx: number | undefined;
+          while ((idx = queue.shift()) !== undefined) {
+            await processChunk(idx);
+          }
+        })
+      );
 
       const allItems = Array.from(itemMap.values());
       res.write(`\nDone — ${allItems.length} items extracted.\n\n`);
       res.write(JSON.stringify({ items: allItems }));
     } else {
       await streamTextToResponse(anthropic, {
-        model: 'claude-opus-4-8',
+        // Opus for images (vision-heavy); Sonnet for text/csv/pdf (faster).
+        model: isImage ? 'claude-opus-4-8' : 'claude-sonnet-4-6',
         max_tokens: 32000,
         system: INVENTORY_EXTRACT_PROMPT,
         messages: [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],

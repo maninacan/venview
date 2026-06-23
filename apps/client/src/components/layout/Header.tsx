@@ -66,13 +66,13 @@ export function Header({ companyId, companyName }: Props) {
         className="flex items-center gap-2.5 no-underline flex-shrink-0"
         onClick={closeMenu}
       >
-        <img src={venviewLogo} alt="VenView" className="h-[50px] w-auto" />
+        <img src={venviewLogo} alt="venOS" className="h-[50px] w-auto" />
         <div>
           <span
             className="block text-[1.05rem] leading-tight font-bold"
             style={{ color: '#2E7D32' }}
           >
-            VenView Events
+            venOS Events
           </span>
           <span className="block text-[0.68rem] text-[#666]">
             {companyName ?? 'Vendor Intelligence for Events'}
@@ -103,11 +103,11 @@ export function Header({ companyId, companyName }: Props) {
           {inCompany && (
             <>
               <Link to="/companies" className={linkBase} onClick={closeMenu}><i className="fa-solid fa-arrow-left w-4 text-center" /> Companies</Link>
+              <NavLink to={`/companies/${companyId}`} end className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-house w-4 text-center" /> Home</NavLink>
               <NavLink to={`/companies/${companyId}/events`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-calendar-days w-4 text-center" /> Events</NavLink>
               <NavLink to={`/companies/${companyId}/recipes`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-utensils w-4 text-center" /> Recipes</NavLink>
               <NavLink to={`/companies/${companyId}/inventory`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-boxes-stacked w-4 text-center" /> My Inventory</NavLink>
               <NavLink to={`/companies/${companyId}/restock`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-arrows-rotate w-4 text-center" /> Restock</NavLink>
-              <NavLink to={`/companies/${companyId}/form-builder`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-pen-ruler w-4 text-center" /> Form Builder</NavLink>
             </>
           )}
 

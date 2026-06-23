@@ -30,7 +30,7 @@ export function CreateCompanyPage() {
         variables: { input: { ...form, name: form.name.trim() } },
       });
       showToast(`Company "${data.createCompany.name}" created!`, 'success');
-      navigate(`/companies/${data.createCompany.id}/events`);
+      navigate(`/companies/${data.createCompany.id}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create company', 'error');
     } finally {
@@ -45,7 +45,7 @@ export function CreateCompanyPage() {
           Register Your Company
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: '0.88rem', marginBottom: 24 }}>
-          Set up your food truck or vendor business on VenView.
+          Set up your food truck or vendor business on venOS.
         </p>
 
         <div className="card">

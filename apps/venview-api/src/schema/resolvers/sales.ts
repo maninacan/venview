@@ -1,9 +1,59 @@
 import type { AppContext } from '../../context/index.js';
 import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
-import { getSquareClient } from '../../lib/square.js';
+import { decryptToken } from '../../lib/crypto.js';
+import { lookupTaxRates } from '../../lib/taxRates.js';
+import { providerForCompany, type PosEvent } from '../../lib/pos/index.js';
+
+// Resolve the POS provider a company has chosen (null for manual / unset).
+async function companyProvider(companyId: string) {
+  const { data } = await supabase.from('Companies').select('posSystem').eq('id', companyId).single();
+  return providerForCompany((data as Record<string, unknown> | null)?.['posSystem'] as string | null);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Upsert a partial SalesSummary patch by eventID (insert the row if missing).
+async function upsertSales(eventId: string, patch: Record<string, unknown>): Promise<void> {
+  const { data: existing } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
+  const stamped = { ...patch, updatedAt: new Date().toISOString() };
+  if (existing) {
+    await supabase.from('SalesSummary').update(stamped).eq('eventID', eventId);
+  } else {
+    await supabase.from('SalesSummary').insert({ eventID: eventId, ...stamped });
+  }
+}
+
+// Look up state + local rates from the event's ZIP and store them — unless the
+// rate was manually overridden. Best-effort: no-ops when there's no ZIP, no API
+// token, or the lookup fails (rates stay at their current values / 0).
+export async function applyTaxRates(eventId: string): Promise<void> {
+  const { data: ev } = await supabase.from('EventInfo').select('zipCode, companyId').eq('eventID', eventId).single();
+  const evRow = ev as Record<string, unknown> | null;
+  const zip = evRow?.['zipCode'] as string | null;
+  const companyId = evRow?.['companyId'] as string | null;
+  if (!zip || !companyId) return;
+
+  const { data: s } = await supabase.from('SalesSummary').select('taxOverride').eq('eventID', eventId).single();
+  if ((s as Record<string, unknown> | null)?.['taxOverride']) return;
+
+  // Use the company's own (encrypted) TaxJar token.
+  const { data: company } = await supabase.from('Companies').select('taxjarToken').eq('id', companyId).single();
+  const enc = (company as Record<string, unknown> | null)?.['taxjarToken'] as string | null;
+  if (!enc) return;
+  let token: string;
+  try { token = decryptToken(enc); } catch { return; }
+
+  const rates = await lookupTaxRates(zip, token);
+  if (!rates) return;
+
+  await upsertSales(eventId, {
+    stateTaxRate: rates.stateRate,
+    localTaxRate: rates.localRate,
+    taxRate: rates.combinedRate,
+    taxJurisdiction: rates.jurisdiction,
+  });
+}
 
 async function getEventWithCompany(eventId: string) {
   const { data } = await supabase
@@ -20,30 +70,6 @@ async function assertEventAccess(eventId: string, ctx: AppContext) {
   if (!event) throw new Error('Event not found');
   await requireCompanyMember(event['companyId'] as string, ctx.user!.id);
   return event;
-}
-
-function buildDateWindow(event: Record<string, unknown>): { startAt: string; endAt: string } {
-  const days = (event['EventDays'] as Array<Record<string, unknown>> | null) ?? [];
-
-  let startDate: string | null = null;
-  let endDate: string | null = null;
-
-  if (days.length > 0) {
-    const sorted = [...days].sort((a, b) => String(a['eventDate']).localeCompare(String(b['eventDate'])));
-    startDate = sorted[0]['eventDate'] as string;
-    endDate = sorted[sorted.length - 1]['eventDate'] as string;
-  } else {
-    startDate = event['eventDate'] as string | null;
-    endDate = (event['endDate'] as string | null) ?? startDate;
-  }
-
-  if (!startDate) throw new Error('Event has no date set');
-
-  const start = new Date(startDate + 'T00:00:00Z');
-  const end = new Date((endDate ?? startDate) + 'T00:00:00Z');
-  end.setUTCHours(26);
-
-  return { startAt: start.toISOString(), endAt: end.toISOString() };
 }
 
 // ── Resolvers ─────────────────────────────────────────────────────────────────
@@ -63,108 +89,53 @@ export const salesResolvers = {
       const totalCollected = Number(input['totalCollected'] ?? 0);
       const netSales = grossSales - refunds - discounts;
 
-      const upsertData = { eventID: eventId, grossSales, netSales, refunds, discounts, totalCollected, updatedAt: new Date().toISOString() };
+      await upsertSales(eventId, { grossSales, netSales, refunds, discounts, totalCollected });
+      // Best-effort: ensure state/local rates are populated from the ZIP.
+      await applyTaxRates(eventId);
 
-      const { data: existing } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
-      const { data, error } = existing
-        ? await supabase.from('SalesSummary').update(upsertData).eq('eventID', eventId).select().single()
-        : await supabase.from('SalesSummary').insert(upsertData).select().single();
-
-      if (error) throw new Error(error.message);
+      const { data } = await supabase.from('SalesSummary').select('*').eq('eventID', eventId).single();
       return data;
     },
 
-    updateTaxOverride: async (
+    // Manually set the state + local rates (flags an override so auto-lookup
+    // won't clobber them).
+    setEventTaxRates: async (
       _: unknown,
-      { eventId, taxRate }: { eventId: string; taxRate: number },
+      { eventId, stateTaxRate, localTaxRate }: { eventId: string; stateTaxRate: number; localTaxRate: number },
       ctx: AppContext
     ) => {
       await assertEventAccess(eventId, ctx);
-
-      const { data: existing } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
-      const update = { eventID: eventId, taxRate, taxOverride: true, updatedAt: new Date().toISOString() };
-      const { data, error } = existing
-        ? await supabase.from('SalesSummary').update({ taxRate, taxOverride: true }).eq('eventID', eventId).select().single()
-        : await supabase.from('SalesSummary').insert(update).select().single();
-
-      if (error) throw new Error(error.message);
+      await upsertSales(eventId, {
+        stateTaxRate,
+        localTaxRate,
+        taxRate: +(stateTaxRate + localTaxRate).toFixed(6),
+        taxOverride: true,
+      });
+      const { data } = await supabase.from('SalesSummary').select('*').eq('eventID', eventId).single();
       return data;
     },
 
-    syncSquareSales: async (_: unknown, { eventId }: { eventId: string }, ctx: AppContext) => {
+    // Clear the override and re-look-up rates from the event's ZIP.
+    refreshEventTaxRates: async (_: unknown, { eventId }: { eventId: string }, ctx: AppContext) => {
+      await assertEventAccess(eventId, ctx);
+      await upsertSales(eventId, { taxOverride: false });
+      await applyTaxRates(eventId);
+      const { data } = await supabase.from('SalesSummary').select('*').eq('eventID', eventId).single();
+      return data;
+    },
+
+    // Pull sales from the company's connected POS provider (dispatch by posSystem).
+    syncSales: async (_: unknown, { eventId }: { eventId: string }, ctx: AppContext) => {
       const event = await assertEventAccess(eventId, ctx);
       const companyId = event['companyId'] as string;
 
-      if (!event['squareLocationId']) {
-        throw new Error('Event has no Square location linked. Edit the event and select a Square Location first.');
-      }
+      const provider = await companyProvider(companyId);
+      if (!provider || !provider.implemented) throw new Error('No POS is connected for this company.');
+      if (!provider.capabilities.sales) throw new Error(`${provider.displayName} doesn't support sales sync.`);
 
-      const squareClient = await getSquareClient(companyId);
-      const locationId = event['squareLocationId'] as string;
-      const { startAt, endAt } = buildDateWindow(event);
+      const pull = await provider.pullSales(companyId, event as unknown as PosEvent);
 
-      // ── Fetch orders (paginated) ────────────────────────────────────────────
-      const allOrders: Array<Record<string, unknown>> = [];
-      let cursor: string | undefined;
-      do {
-        const ordersResponse = await squareClient.orders.search({
-          locationIds: [locationId],
-          query: {
-            filter: {
-              dateTimeFilter: { createdAt: { startAt, endAt } },
-              stateFilter: { states: ['COMPLETED' as const] },
-            },
-          },
-          ...(cursor ? { cursor } : {}),
-        });
-        for (const order of ordersResponse.orders ?? []) {
-          allOrders.push(order as unknown as Record<string, unknown>);
-        }
-        cursor = ordersResponse.cursor ?? undefined;
-      } while (cursor);
-
-      // ── Fetch payments (Page-based) ─────────────────────────────────────────
-      const allPayments: Array<Record<string, unknown>> = [];
-      const paymentsPage = await squareClient.payments.list({ locationId, beginTime: startAt, endTime: endAt });
-      for await (const payment of paymentsPage) {
-        allPayments.push(payment as unknown as Record<string, unknown>);
-      }
-
-      // ── Aggregate totals from orders ────────────────────────────────────────
-      let grossSales = 0, discounts = 0, tips = 0;
-      const itemMap = new Map<string, { name: string; qty: number }>();
-
-      for (const order of allOrders) {
-        const totalMoney = order['totalMoney'] as { amount?: bigint } | null;
-        const discountMoney = order['totalDiscountMoney'] as { amount?: bigint } | null;
-        const tipMoney = order['totalTipMoney'] as { amount?: bigint } | null;
-        const taxMoney = order['totalTaxMoney'] as { amount?: bigint } | null;
-
-        grossSales += (Number(totalMoney?.amount ?? 0) - Number(taxMoney?.amount ?? 0) - Number(tipMoney?.amount ?? 0)) / 100;
-        discounts += Number(discountMoney?.amount ?? 0) / 100;
-        tips += Number(tipMoney?.amount ?? 0) / 100;
-
-        for (const item of (order['lineItems'] as Array<Record<string, unknown>> | null) ?? []) {
-          const name = (item['name'] as string ?? '').trim();
-          const qty = Number(item['quantity'] ?? 0);
-          if (!name) continue;
-          itemMap.set(name, { name, qty: (itemMap.get(name)?.qty ?? 0) + qty });
-        }
-      }
-
-      // ── Aggregate from payments ─────────────────────────────────────────────
-      let squareFees = 0, totalCollected = 0, refunds = 0;
-      for (const payment of allPayments) {
-        totalCollected += Number((payment['amountMoney'] as { amount?: bigint } | null)?.amount ?? 0) / 100;
-        refunds += Number((payment['refundedMoney'] as { amount?: bigint } | null)?.amount ?? 0) / 100;
-        for (const fee of (payment['processingFee'] as Array<{ effectiveMoney?: { amount?: bigint } }> | null) ?? []) {
-          squareFees += Math.abs(Number(fee.effectiveMoney?.amount ?? 0)) / 100;
-        }
-      }
-
-      const netSales = grossSales - refunds - discounts;
-
-      // ── Match items to inventory via POS mappings ───────────────────────────
+      // Match items to inventory via POS mappings.
       const { data: mappings } = await supabase
         .from('PosItemMapping')
         .select('posItemName, inventoryId, VendorInventory(itemName, unitCost)')
@@ -172,8 +143,7 @@ export const salesResolvers = {
 
       const inventoryRows: Array<Record<string, unknown>> = [];
       let unmatchedCount = 0;
-
-      for (const [, item] of itemMap) {
+      for (const item of pull.items) {
         const mapping = (mappings ?? []).find(
           (m: Record<string, unknown>) => String(m['posItemName']).toLowerCase() === item.name.toLowerCase()
         );
@@ -183,8 +153,19 @@ export const salesResolvers = {
         inventoryRows.push({ eventID: eventId, name: item.name, quantitySold: item.qty, unitPrice: unitCost, totalCost: unitCost != null ? unitCost * item.qty : null });
       }
 
-      // ── Upsert SalesSummary ─────────────────────────────────────────────────
-      const salesData = { eventID: eventId, grossSales: +grossSales.toFixed(2), netSales: +netSales.toFixed(2), discounts: +discounts.toFixed(2), refunds: +refunds.toFixed(2), tips: +tips.toFixed(2), squareFees: +squareFees.toFixed(2), totalCollected: +totalCollected.toFixed(2), updatedAt: new Date().toISOString() };
+      const netSales = pull.grossSales - pull.refunds - pull.discounts;
+      const salesData = {
+        eventID: eventId,
+        grossSales: +pull.grossSales.toFixed(2),
+        netSales: +netSales.toFixed(2),
+        discounts: +pull.discounts.toFixed(2),
+        refunds: +pull.refunds.toFixed(2),
+        tips: +pull.tips.toFixed(2),
+        squareFees: +pull.processingFees.toFixed(2), // POS processing fees (column kept for compat)
+        totalCollected: +pull.totalCollected.toFixed(2),
+        taxCollected: +pull.taxCollected.toFixed(2),
+        updatedAt: new Date().toISOString(),
+      };
       const { data: existingSales } = await supabase.from('SalesSummary').select('id').eq('eventID', eventId).single();
       if (existingSales) {
         await supabase.from('SalesSummary').update(salesData).eq('eventID', eventId);
@@ -192,79 +173,25 @@ export const salesResolvers = {
         await supabase.from('SalesSummary').insert(salesData);
       }
 
-      // ── Replace InventorySales ──────────────────────────────────────────────
+      await applyTaxRates(eventId);
+
       await supabase.from('InventorySales').delete().eq('eventID', eventId);
       if (inventoryRows.length > 0) await supabase.from('InventorySales').insert(inventoryRows);
 
-      return { success: true, message: `Synced ${allOrders.length} orders. ${unmatchedCount} item(s) missing inventory cost.`, unmatchedCount };
+      return { success: true, message: `Synced ${pull.orderCount} orders. ${unmatchedCount} item(s) missing inventory cost.`, unmatchedCount };
     },
 
-    syncSquareLabor: async (_: unknown, { eventId }: { eventId: string }, ctx: AppContext) => {
+    // Pull labor from the company's POS provider (only if it supports labor).
+    syncLabor: async (_: unknown, { eventId }: { eventId: string }, ctx: AppContext) => {
       const event = await assertEventAccess(eventId, ctx);
       const companyId = event['companyId'] as string;
-      if (!event['squareLocationId']) throw new Error('Event has no Square location linked.');
 
-      const squareClient = await getSquareClient(companyId);
-      const locationId = event['squareLocationId'] as string;
-      const { startAt, endAt } = buildDateWindow(event);
+      const provider = await companyProvider(companyId);
+      if (!provider || !provider.implemented) throw new Error('No POS is connected for this company.');
+      if (!provider.capabilities.labor) throw new Error(`${provider.displayName} doesn't support labor import.`);
 
-      // ── Fetch timecards using workday filter ────────────────────────────────
-      const allTimecards: Array<Record<string, unknown>> = [];
-      let cursor: string | undefined;
-      const startDate = startAt.split('T')[0];
-      const endDate = endAt.split('T')[0];
-      do {
-        const response = await squareClient.labor.searchTimecards({
-          query: {
-            filter: {
-              locationIds: [locationId],
-              workday: { dateRange: { startDate, endDate }, matchTimecardsBy: 'START_AT' },
-            },
-          },
-          ...(cursor ? { cursor } : {}),
-        });
-        for (const tc of response.timecards ?? []) {
-          allTimecards.push(tc as unknown as Record<string, unknown>);
-        }
-        cursor = response.cursor ?? undefined;
-      } while (cursor);
-
-      // ── Look up team member wages ───────────────────────────────────────────
-      const memberWageMap = new Map<string, { name: string; wage: number }>();
-      const memberIds = [...new Set(allTimecards.map(tc => tc['teamMemberId'] as string).filter(Boolean))];
-
-      await Promise.all(memberIds.map(async memberId => {
-        try {
-          // List wages for this team member
-          const wagesPage = await squareClient.labor.teamMemberWages.list({ teamMemberId: memberId, limit: 1 });
-          const wages = wagesPage.data ?? [];
-          const wage = wages[0] as Record<string, unknown> | undefined;
-          const hourlyRate = wage ? Number((wage['hourlyRate'] as { amount?: bigint } | null)?.amount ?? 0) / 100 : 0;
-
-          // Get member name
-          const memberResponse = await squareClient.teamMembers.get({ teamMemberId: memberId });
-          const member = memberResponse.teamMember as Record<string, unknown> | null;
-          const name = member
-            ? `${member['givenName'] ?? ''} ${member['familyName'] ?? ''}`.trim() || memberId
-            : memberId;
-
-          memberWageMap.set(memberId, { name, wage: hourlyRate });
-        } catch {
-          memberWageMap.set(memberId, { name: memberId, wage: 0 });
-        }
-      }));
-
-      // ── Build labor rows ────────────────────────────────────────────────────
-      const laborRows = allTimecards.map(tc => {
-        const memberId = tc['teamMemberId'] as string;
-        const clockInEvent = tc['clockInEvent'] as Record<string, unknown> | null;
-        const clockOutEvent = tc['clockOutEvent'] as Record<string, unknown> | null;
-        const clockIn = new Date(clockInEvent?.['createdAt'] as string ?? startAt);
-        const clockOut = clockOutEvent ? new Date(clockOutEvent['createdAt'] as string) : new Date();
-        const hours = Math.round((clockOut.getTime() - clockIn.getTime()) / 36000) / 100;
-        const member = memberWageMap.get(memberId) ?? { name: memberId, wage: 0 };
-        return { eventID: eventId, name: member.name, hours, wage: member.wage };
-      });
+      const pull = await provider.pullLabor(companyId, event as unknown as PosEvent);
+      const laborRows = pull.rows.map(r => ({ eventID: eventId, name: r.name, hours: r.hours, wage: r.wage }));
 
       await supabase.from('EventLabor').delete().eq('eventID', eventId);
       if (laborRows.length > 0) await supabase.from('EventLabor').insert(laborRows);
@@ -288,44 +215,20 @@ export const salesResolvers = {
   },
 
   Query: {
-    squareStatus: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
+    posLocations: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
       requireAuth(ctx);
       await requireCompanyMember(companyId, ctx.user!.id);
-      const { data } = await supabase.from('SquareConnection').select('locationId, locationName').eq('companyId', companyId).single();
-      if (!data) return { connected: false };
-      return { connected: true, locationId: (data as Record<string, unknown>)['locationId'], locationName: (data as Record<string, unknown>)['locationName'] };
+      const provider = await companyProvider(companyId);
+      if (!provider || !provider.implemented) return [];
+      try { return await provider.listLocations(companyId); } catch { return []; }
     },
 
-    squareLocations: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
+    posCatalog: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
       requireAuth(ctx);
       await requireCompanyMember(companyId, ctx.user!.id);
-      try {
-        const squareClient = await getSquareClient(companyId);
-        const response = await squareClient.locations.list();
-        return (response.locations ?? []).map((loc) => {
-          const l = loc as Record<string, unknown>;
-          return { id: l['id'], name: l['name'] };
-        });
-      } catch { return []; }
-    },
-
-    squareCatalog: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
-      requireAuth(ctx);
-      await requireCompanyMember(companyId, ctx.user!.id);
-      try {
-        const squareClient = await getSquareClient(companyId);
-        const items: Array<Record<string, unknown>> = [];
-        const page = await squareClient.catalog.list({ types: 'ITEM' });
-        for await (const obj of page) {
-          const catalogObj = obj as unknown as Record<string, unknown>;
-          const itemData = catalogObj['itemData'] as Record<string, unknown> | null;
-          for (const v of (itemData?.['variations'] ?? []) as Array<Record<string, unknown>>) {
-            const varData = v['itemVariationData'] as Record<string, unknown> | null;
-            items.push({ posItemId: v['id'], posItemName: itemData?.['name'] ?? '', variationName: varData?.['name'] ?? 'Regular', price: Number((varData?.['priceMoney'] as { amount?: bigint } | null)?.amount ?? 0) / 100 });
-          }
-        }
-        return items;
-      } catch { return []; }
+      const provider = await companyProvider(companyId);
+      if (!provider || !provider.implemented) return [];
+      try { return await provider.listCatalog(companyId); } catch { return []; }
     },
   },
 };

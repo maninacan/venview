@@ -5,7 +5,6 @@ import { salesResolvers } from './sales.js';
 import { laborResolvers } from './labor.js';
 import { expenseResolvers } from './expenses.js';
 import { adminResolvers } from './admin.js';
-import { formTemplateResolvers } from './formtemplates.js';
 import { recipeResolvers } from './recipes.js';
 import { inventoryResolvers } from './inventory.js';
 
@@ -16,7 +15,6 @@ export const resolvers = {
     ...eventResolvers.Query,
     ...salesResolvers.Query,
     ...laborResolvers.Query,
-    ...formTemplateResolvers.Query,
     ...adminResolvers.Query,
     ...recipeResolvers.Query,
     ...inventoryResolvers.Query,
@@ -27,7 +25,6 @@ export const resolvers = {
     ...salesResolvers.Mutation,
     ...laborResolvers.Mutation,
     ...expenseResolvers.Mutation,
-    ...formTemplateResolvers.Mutation,
     ...adminResolvers.Mutation,
     ...recipeResolvers.Mutation,
     ...inventoryResolvers.Mutation,

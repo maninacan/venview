@@ -25,7 +25,7 @@ export function WelcomeModal({ companyId, onClose }: Props) {
       <div className="bg-white rounded-[20px] w-full max-w-[640px] max-h-[90vh] overflow-y-auto">
         <div className="px-8 pb-[18px] pt-7 text-center">
           <div className="inline-block bg-[#fef3c7] text-[#92400e] text-[0.75rem] font-bold px-2.5 py-[3px] rounded-full mb-2.5">🧪 Beta</div>
-          <h2 className="text-[#0B2A4A] mt-0 mb-1.5 text-[1.4rem]">Welcome to VenView!</h2>
+          <h2 className="text-[#0B2A4A] mt-0 mb-1.5 text-[1.4rem]">Welcome to venOS!</h2>
           <p className="text-[#64748b] text-[0.88rem] mt-0 mb-2">You're helping us build the simplest way for event vendors to know if they actually made money.</p>
           <p className="text-[0.84rem] mt-0 mb-1.5">This beta version is focused on one thing:<br /><strong>Getting you from event → to true profit in minutes.</strong></p>
         </div>
@@ -49,7 +49,7 @@ export function WelcomeModal({ companyId, onClose }: Props) {
             <div className="bg-[#f8fafc] rounded-xl p-4">
               <div className={stepNum}>2</div>
               <h3 className="mt-0 mb-1.5 text-[0.93rem] font-bold">Connect &amp; Sync Sales</h3>
-              <p className="mt-0 mb-2.5 text-[0.83rem] text-[#64748b]">If you use Square, connect it in Settings. VenView will pull your real sales and tax data automatically.</p>
+              <p className="mt-0 mb-2.5 text-[0.83rem] text-[#64748b]">If you use Square, connect it in Settings. venOS will pull your real sales and tax data automatically.</p>
               <p className="mt-0 mb-2.5 text-[0.83rem] text-[#64748b]">If not, enter totals manually.</p>
               <button className="btn-secondary w-full justify-center text-[0.82rem] py-[7px] mt-1" onClick={goManageEvents}>Sync Sales</button>
             </div>

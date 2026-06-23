@@ -17,7 +17,7 @@ export function Header() {
           className="block text-[1.05rem] text-white leading-tight"
           style={{ fontFamily: "'DM Serif Display', serif" }}
         >
-          VenView Super Admin
+          venOS Super Admin
         </span>
       </Link>
       <div className="flex items-center gap-0.5">

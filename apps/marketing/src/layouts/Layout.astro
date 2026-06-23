@@ -5,8 +5,8 @@ interface Props {
 }
 
 const {
-  title = "VenView — Know Your Event Profit, Instantly",
-  description = "VenView pulls all your event numbers together — Square fees, labor, supplies, refunds — so you finally know if your event was worth it.",
+  title = "venOS — Know Your Event Profit, Instantly",
+  description = "venOS pulls all your event numbers together — Square fees, labor, supplies, refunds — so you finally know if your event was worth it.",
 } = Astro.props;
 ---
 
@@ -18,12 +18,12 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://venview.app/" />
+    <link rel="canonical" href="https://venos.app/" />
 
     <meta property="og:title" content={title} />
     <meta property="og:description" content="Stop guessing. See exactly where your money went after every event." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://venview.app/" />
+    <meta property="og:url" content="https://venos.app/" />
 
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -54,7 +54,7 @@ const {
     <slot />
 
     <footer>
-      <p>© 2026 VenView &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="mailto:hello@venview.app">hello@venview.app</a></p>
+      <p>© 2026 venOS &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="mailto:hello@venos.app">hello@venos.app</a></p>
     </footer>
 
   </body>

@@ -198,6 +198,15 @@ export const inventoryResolvers = {
       requireAuth(ctx);
       await requireCompanyMember(companyId, ctx.user!.id);
 
+      // The POS system is determined by the company's configured provider —
+      // never trust a client-supplied value.
+      const { data: companyRow } = await supabase
+        .from('Company')
+        .select('posSystem')
+        .eq('id', companyId)
+        .single();
+      const posSystem = companyRow?.posSystem ?? 'square';
+
       // Delete existing and replace
       await supabase.from('PosItemMapping').delete().eq('companyId', companyId);
 
@@ -205,7 +214,7 @@ export const inventoryResolvers = {
         .filter(m => m['posItemId'])
         .map(m => ({
           companyId,
-          posSystem: m['posSystem'] ?? 'square',
+          posSystem,
           posItemId: m['posItemId'],
           posItemName: m['posItemName'],
           variationName: m['variationName'],

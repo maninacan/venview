@@ -5,7 +5,7 @@ import { showToast } from '@org/data';
 
 const GET_DATA = gql`
   query GetPosMappingData($companyId: ID!) {
-    squareCatalog(companyId: $companyId) { posItemId posItemName variationName price }
+    posCatalog(companyId: $companyId) { posItemId posItemName variationName price }
     inventory(companyId: $companyId) { id name unitCost }
     posMappings(companyId: $companyId) { posItemId inventoryItemId }
   }
@@ -67,7 +67,7 @@ export function PosMappingModal({ companyId, onClose }: Props) {
   const [mappings, setMappings] = useState<Map<string, Mapping>>(new Map());
   const [saving, setSaving] = useState(false);
 
-  const catalogItems: CatalogItem[] = data?.squareCatalog ?? [];
+  const catalogItems: CatalogItem[] = data?.posCatalog ?? [];
   const inventoryItems: InventoryItem[] = data?.inventory ?? [];
   const existingMaps: Array<{ posItemId: string; inventoryItemId: string }> = data?.posMappings ?? [];
 
@@ -124,10 +124,10 @@ export function PosMappingModal({ companyId, onClose }: Props) {
         {/* Header */}
         <div style={{ padding: '22px 26px 14px', borderBottom: '1px solid #e5e7eb' }}>
           <h2 style={{ margin: '0 0 6px', fontSize: '1.15rem', fontWeight: 700, color: 'var(--vv-navy)' }}>
-            Match Your Square Menu to Your Recipe Cards
+            Match Your POS Menu to Your Recipe Cards
           </h2>
           <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-            Map each Square item to an inventory item once — VenView calculates costs automatically every sync. Use <em>"Not in my menu"</em> for tips, misc charges, etc.
+            Map each POS item to an inventory item once — venOS calculates costs automatically every sync. Use <em>"Not in my menu"</em> for tips, misc charges, etc.
           </p>
         </div>
 
@@ -152,14 +152,14 @@ export function PosMappingModal({ companyId, onClose }: Props) {
           </div>
         ) : catalogItems.length === 0 ? (
           <div style={{ padding: '24px 26px', color: 'var(--muted)', fontSize: '0.88rem' }}>
-            No Square catalog items found. Make sure Square is connected and has items.
+            No POS catalog items found. Make sure your POS is connected and has items.
           </div>
         ) : (
           <div style={{ overflowY: 'auto', maxHeight: 400 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb', width: '45%' }}>Square Item</th>
+                  <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb', width: '45%' }}>POS Item</th>
                   <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb' }}>Your Inventory Item</th>
                 </tr>
               </thead>

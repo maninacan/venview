@@ -3,10 +3,11 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "start": "doppler run -- nx run-many -t serve -p client venview-api marketing --parallel=3",
+    "start": "trap 'kill 0' SIGINT EXIT; npm run start:stripe & doppler run -- nx run-many -t serve -p client venview-api marketing --parallel=3",
     "start:client": "doppler run -- nx serve client",
     "start:api": "doppler run -- nx serve venview-api",
     "start:marketing": "doppler run -- nx dev marketing",
+    "start:stripe": "doppler run -- stripe listen --forward-to localhost:3000/api/billing/webhook",
     "build": "doppler run -- nx run-many -t build -p client venview-api marketing --parallel=3",
     "build:client": "doppler run -- nx build client",
     "build:api": "nx build venview-api",

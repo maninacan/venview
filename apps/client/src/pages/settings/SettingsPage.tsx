@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
@@ -9,10 +9,10 @@ import { PosMappingModal } from '../../components/modals/PosMappingModal';
 const GET_SETTINGS = gql`
   query GetSettings($companyId: ID!) {
     company(id: $companyId) {
-      id name phone contactName vendorCategory email joinCode plan pendingOwnerId
+      id name phone contactName vendorCategory email joinCode plan pendingOwnerId taxjarConnected posSystem
       members { userId email role }
       pendingRequests { userId email role }
-      squareStatus { connected locationName locationId }
+      posStatus { connected provider locationName locationId }
     }
   }
 `;
@@ -31,11 +31,6 @@ const LEAVE = gql`
     leaveCompany(companyId: $companyId)
   }
 `;
-const REQUEST_ACCESS = gql`
-  mutation RequestAccess($joinCode: String!) {
-    requestAccess(joinCode: $joinCode) { companyName status }
-  }
-`;
 const APPROVE_MEMBER = gql`
   mutation ApproveMember($companyId: ID!, $userId: ID!) {
     approveMember(companyId: $companyId, userId: $userId)
@@ -44,6 +39,16 @@ const APPROVE_MEMBER = gql`
 const INVITE_MEMBER = gql`
   mutation InviteMember($companyId: ID!, $email: String!) {
     inviteMember(companyId: $companyId, email: $email) { email status }
+  }
+`;
+const SET_TAXJAR = gql`
+  mutation SetTaxjarToken($companyId: ID!, $token: String!) {
+    setTaxjarToken(companyId: $companyId, token: $token)
+  }
+`;
+const REMOVE_TAXJAR = gql`
+  mutation RemoveTaxjarToken($companyId: ID!) {
+    removeTaxjarToken(companyId: $companyId)
   }
 `;
 const OFFER_OWNERSHIP = gql`
@@ -69,20 +74,32 @@ const DELETE_COMPANY = gql`
 
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
 
+// Client-side mirror of the server POS registry. `implemented` gates the
+// connect flow; capabilities drive which actions appear. Keep in sync with
+// apps/venview-api/src/lib/pos/index.ts.
+interface PosMeta { displayName: string; blurb: string; implemented: boolean; }
+const POS_META: Record<string, PosMeta> = {
+  square: { displayName: 'Square', blurb: 'Sync sales, locations & labor automatically', implemented: true },
+  shopify: { displayName: 'Shopify', blurb: 'Sync sales automatically', implemented: false },
+  toast: { displayName: 'Toast', blurb: 'Sync sales & labor automatically', implemented: true },
+};
+
 export function SettingsPage() {
   const { companyId, company } = useCurrentCompany();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [updateCompany] = useMutation(UPDATE_COMPANY);
   const [removeMember] = useMutation(REMOVE_MEMBER);
   const [leaveCompany] = useMutation(LEAVE);
-  const [requestAccess] = useMutation(REQUEST_ACCESS);
   const [approveMember] = useMutation(APPROVE_MEMBER);
   const [inviteMember] = useMutation(INVITE_MEMBER);
   const [offerOwnership] = useMutation(OFFER_OWNERSHIP);
   const [acceptOwnership] = useMutation(ACCEPT_OWNERSHIP);
   const [declineOwnership] = useMutation(DECLINE_OWNERSHIP);
   const [deleteCompany] = useMutation(DELETE_COMPANY);
+  const [setTaxjarToken] = useMutation(SET_TAXJAR);
+  const [removeTaxjarToken] = useMutation(REMOVE_TAXJAR);
   const { user } = useAuth();
 
   const { data, loading, refetch } = useQuery(GET_SETTINGS, {
@@ -93,16 +110,20 @@ export function SettingsPage() {
   const [showPosMappings, setShowPosMappings] = useState(false);
   const [companyForm, setCompanyForm] = useState({ name: '', phone: '', contactName: '', vendorCategory: '', email: '' });
   const [savingCompany, setSavingCompany] = useState(false);
-  const [connectingSquare, setConnectingSquare] = useState(false);
-  const [joinCode, setJoinCode] = useState('');
-  const [joiningCode, setJoiningCode] = useState(false);
+  const [connectingPos, setConnectingPos] = useState(false);
+  const [toastGuid, setToastGuid] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [inviteCooldown, setInviteCooldown] = useState(0);
   const [transferTo, setTransferTo] = useState('');
+  const [taxjarInput, setTaxjarInput] = useState('');
+  const [savingTaxjar, setSavingTaxjar] = useState(false);
 
   const info = data?.company;
-  const squareStatus = info?.squareStatus;
+  const posStatus = info?.posStatus;
+  // The company's chosen POS (falls back to Square for legacy companies).
+  const provider = (posStatus?.provider ?? info?.posSystem ?? 'square') as string;
+  const posMeta = POS_META[provider] ?? POS_META['square'];
   const members = info?.members ?? [];
   const pendingRequests = info?.pendingRequests ?? [];
   const isOwner = members.some((m: { userId: string; role: string }) => m.userId === user?.id && m.role === 'owner');
@@ -126,51 +147,109 @@ export function SettingsPage() {
     });
   }, [info]);
 
+  // Scroll to an anchored section (e.g. #team-access) once content has rendered
+  useEffect(() => {
+    if (loading || !location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [loading, location.hash]);
+
   // Handle post-OAuth redirect
   useEffect(() => {
-    const sq = searchParams.get('sq');
-    if (sq === 'connected') {
-      showToast('✅ Square connected successfully! Your locations are now available.', 'success', 6000);
+    const pos = searchParams.get('pos');
+    if (pos === 'connected') {
+      showToast('✅ POS connected successfully! Your locations are now available.', 'success', 6000);
       setSearchParams({});
       refetch();
-    } else if (sq === 'error') {
-      showToast('Square connection failed. Please try again.', 'error');
+    } else if (pos === 'error') {
+      showToast('POS connection failed. Please try again.', 'error');
       setSearchParams({});
     }
   }, [searchParams, setSearchParams, refetch]);
 
-  async function handleConnectSquare() {
-    setConnectingSquare(true);
+  async function handleConnectPos() {
+    setConnectingPos(true);
     try {
       const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(`${API_URL}/api/square/oauth/start?companyId=${companyId}`, {
+      const res = await fetch(`${API_URL}/api/pos/${provider}/oauth/start?companyId=${companyId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const result = await res.json() as { url?: string; error?: string };
       if (!result.url) throw new Error(result.error ?? 'Failed to get OAuth URL');
       window.location.href = result.url;
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to connect Square', 'error');
-      setConnectingSquare(false);
+      showToast(err instanceof Error ? err.message : `Failed to connect ${posMeta.displayName}`, 'error');
+      setConnectingPos(false);
     }
   }
 
-  async function handleDisconnectSquare() {
-    if (!confirm('Disconnect Square? You will need to reconnect to sync sales.')) return;
+  // Toast connects by entering a restaurant GUID (client-credentials model),
+  // not a redirect OAuth flow like Square.
+  async function handleConnectToast() {
+    if (!toastGuid.trim()) return;
+    setConnectingPos(true);
     try {
       const { supabase } = await import('@org/data');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(`${API_URL}/api/square/disconnect/${companyId}`, {
+      const res = await fetch(`${API_URL}/api/pos/toast/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ companyId, restaurantGuid: toastGuid.trim() }),
+      });
+      const result = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !result.success) throw new Error(result.error ?? 'Failed to connect Toast');
+      showToast('Toast connected.', 'success');
+      setToastGuid('');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to connect Toast', 'error');
+    } finally {
+      setConnectingPos(false);
+    }
+  }
+
+  async function handleDisconnectPos() {
+    if (!confirm(`Disconnect ${posMeta.displayName}? You will need to reconnect to sync sales.`)) return;
+    try {
+      const { supabase } = await import('@org/data');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch(`${API_URL}/api/pos/${provider}/disconnect/${companyId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('Disconnect failed');
-      showToast('Square disconnected.', 'info');
+      showToast(`${posMeta.displayName} disconnected.`, 'info');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to disconnect', 'error');
+    }
+  }
+
+  async function handleSaveTaxjar() {
+    if (!taxjarInput.trim()) return;
+    setSavingTaxjar(true);
+    try {
+      await setTaxjarToken({ variables: { companyId, token: taxjarInput.trim() } });
+      showToast('TaxJar connected.', 'success');
+      setTaxjarInput('');
+      refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save token', 'error');
+    } finally { setSavingTaxjar(false); }
+  }
+
+  async function handleRemoveTaxjar() {
+    if (!confirm('Disconnect TaxJar? Tax rates will no longer auto-look-up.')) return;
+    try {
+      await removeTaxjarToken({ variables: { companyId } });
+      showToast('TaxJar disconnected.', 'info');
       refetch();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to disconnect', 'error');
@@ -197,23 +276,6 @@ export function SettingsPage() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to remove member', 'error');
     }
-  }
-
-  async function handleJoinCode() {
-    if (!joinCode.trim()) return;
-    setJoiningCode(true);
-    try {
-      const { data: result } = await requestAccess({ variables: { joinCode: joinCode.trim().toUpperCase() } });
-      const { companyName, status } = result.requestAccess;
-      if (status === 'active') {
-        showToast(`You're already a member of ${companyName}.`, 'info');
-      } else {
-        showToast(`Access requested for ${companyName} — pending owner approval.`, 'success', 6000);
-      }
-      setJoinCode('');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Invalid join code', 'error');
-    } finally { setJoiningCode(false); }
   }
 
   async function handleInvite() {
@@ -346,7 +408,7 @@ export function SettingsPage() {
 
   return (
     <>
-      {/* Square Integration */}
+      {/* POS Integration */}
       <div className="card">
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>Settings</h2>
@@ -364,38 +426,104 @@ export function SettingsPage() {
               </svg>
             </div>
             <div>
-              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">Square POS</h3>
-              <p className="m-0 text-[0.8rem] text-[#64748b]">Sync sales, locations &amp; labor automatically</p>
+              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">{posMeta.displayName} POS</h3>
+              <p className="m-0 text-[0.8rem] text-[#64748b]">{posMeta.blurb}</p>
             </div>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${squareStatus?.connected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
-              {squareStatus?.connected ? `✓ Connected${squareStatus.locationName ? ` — ${squareStatus.locationName}` : ''}` : 'Not Connected'}
+            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${posStatus?.connected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
+              {posStatus?.connected ? `✓ Connected${posStatus.locationName ? ` — ${posStatus.locationName}` : ''}` : posMeta.implemented ? 'Not Connected' : 'Coming Soon'}
             </span>
           </div>
 
-          {squareStatus?.connected ? (
+          {posStatus?.connected ? (
             <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => setShowPosMappings(true)}>
                 🗺 Manage POS Mappings
               </button>
-              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleDisconnectSquare}>
-                Disconnect Square
+              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleDisconnectPos}>
+                Disconnect {posMeta.displayName}
               </button>
+            </div>
+          ) : provider === 'toast' ? (
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.8rem' }}>Toast Restaurant GUID</label>
+                <input
+                  type="text"
+                  value={toastGuid}
+                  onChange={e => setToastGuid(e.target.value)}
+                  placeholder="e.g. 1a2b3c4d-…"
+                  style={{ width: 280 }}
+                />
+              </div>
+              <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleConnectToast} disabled={connectingPos || !toastGuid.trim()}>
+                {connectingPos && <span className="spinner" />} <span>Connect Toast</span>
+              </button>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0', flexBasis: '100%' }}>
+                Find your restaurant GUID in Toast Web under Integrations, then paste it here to sync sales and labor.
+              </p>
+            </div>
+          ) : posMeta.implemented ? (
+            <div style={{ marginTop: 14 }}>
+              <button className="btn-primary" onClick={handleConnectPos} disabled={connectingPos}>
+                {connectingPos && <span className="spinner" />}
+                <span>Connect {posMeta.displayName}</span>
+              </button>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
+                Connect your {posMeta.displayName} account to automatically sync sales{posMeta.blurb.includes('labor') ? ', locations, and labor' : ' and locations'}.
+              </p>
             </div>
           ) : (
             <div style={{ marginTop: 14 }}>
-              <button className="btn-primary" onClick={handleConnectSquare} disabled={connectingSquare}>
-                {connectingSquare && <span className="spinner" />}
-                <span>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0 }}>
-                  <rect x=".5" y=".5" width="5" height="5" rx=".8" fill="white"/>
-                  <rect x="7.5" y=".5" width="5" height="5" rx=".8" fill="white"/>
-                  <rect x=".5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
-                  <rect x="7.5" y="7.5" width="5" height="5" rx=".8" fill="white"/>
-                </svg>
-                Connect Square</span>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: 0 }}>
+                {posMeta.displayName} support is coming soon.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* TaxJar */}
+        <div className="border border-[rgba(11,42,74,0.12)] rounded-[10px] p-4 mt-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[#16a34a] rounded-md flex items-center justify-center flex-shrink-0 text-white">
+              <i className="fa-solid fa-percent" />
+            </div>
+            <div>
+              <h3 className="m-0 mb-0.5 text-[0.95rem] font-semibold">TaxJar</h3>
+              <p className="m-0 text-[0.8rem] text-[#64748b]">Auto-look-up state &amp; local sales tax rates by ZIP</p>
+            </div>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[0.74rem] font-semibold ml-auto ${info?.taxjarConnected ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
+              {info?.taxjarConnected ? '✓ Connected' : 'Not Connected'}
+            </span>
+          </div>
+
+          {!isOwner ? (
+            <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '12px 0 0' }}>
+              Only the company owner can manage the TaxJar connection.
+            </p>
+          ) : info?.taxjarConnected ? (
+            <div style={{ marginTop: 14 }}>
+              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleRemoveTaxjar}>
+                Disconnect TaxJar
               </button>
-              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0' }}>
-                Connect your Square account to automatically sync sales, locations, and labor.
+            </div>
+          ) : (
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 240 }}>
+                <label style={{ fontSize: '0.8rem' }}>TaxJar API token</label>
+                <input
+                  type="password"
+                  value={taxjarInput}
+                  onChange={e => setTaxjarInput(e.target.value)}
+                  placeholder="Paste your TaxJar API token"
+                  autoComplete="off"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleSaveTaxjar} disabled={savingTaxjar || !taxjarInput.trim()}>
+                {savingTaxjar && <span className="spinner" />} <span>Connect</span>
+              </button>
+              <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '4px 0 0', width: '100%' }}>
+                Get a token at <span style={{ fontWeight: 600 }}>app.taxjar.com → Account → API Access</span>. Stored encrypted; never shown again.
               </p>
             </div>
           )}
@@ -429,7 +557,7 @@ export function SettingsPage() {
       </div>
 
       {/* Team Access */}
-      <div className="card">
+      <div id="team-access" className="card" style={{ scrollMarginTop: 16 }}>
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Team Access</p>
         <p style={{ fontSize: '0.84rem', color: 'var(--muted)', margin: '0 0 16px' }}>
           Share events, inventory, and recipes with your team. Everyone in the same company sees the same data.
@@ -523,17 +651,6 @@ export function SettingsPage() {
             </table>
           </div>
         )}
-
-        {/* Request access via join code */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.8rem' }}>Request access via join code</label>
-            <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter join code" style={{ width: 180, textTransform: 'uppercase' }} />
-          </div>
-          <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleJoinCode} disabled={joiningCode}>
-            {joiningCode && <span className="spinner" />} <span>Request Access</span>
-          </button>
-        </div>
       </div>
 
       {/* Plan info */}
@@ -541,7 +658,7 @@ export function SettingsPage() {
         <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Subscription</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className={`inline-flex items-center text-[0.88rem] font-semibold px-[14px] py-1 rounded-full ${info?.plan === 'pro' ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
-            {info?.plan === 'pro' ? <><i className="fa-solid fa-bolt" /> Venview Pro</> : <><i className="fa-solid fa-clipboard-list" /> Venview Starter</>}
+            {info?.plan === 'pro' ? <><i className="fa-solid fa-bolt" /> venOS Pro</> : <><i className="fa-solid fa-clipboard-list" /> venOS Starter</>}
           </span>
           {info?.plan !== 'pro' && (
             <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
