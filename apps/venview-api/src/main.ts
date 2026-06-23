@@ -13,8 +13,8 @@ import uploadsRouter from './routes/uploads.js';
 import billingRouter from './routes/billing.js';
 import logger from './lib/logger.js';
 
-const host = process.env['HOST'] ?? 'localhost';
-const port = process.env['PORT'] ? Number(process.env['PORT']) : 3000;
+const host = process.env['HOST'] ?? '0.0.0.0';
+const port = process.env['PORT'] ? Number(process.env['PORT']) : 8080;
 
 const clientOrigin = process.env['CLIENT_URL'] ?? 'http://localhost:4200';
 const superAdminOrigin = process.env['SUPER_ADMIN_URL'] ?? 'http://localhost:4202';
