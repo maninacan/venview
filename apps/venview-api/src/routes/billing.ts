@@ -85,7 +85,7 @@ router.post('/billing/checkout', async (req: Request, res: Response) => {
     // Guard against duplicate subscriptions: if one is already active, mirror it
     // and send them to manage it instead of charging a second time.
     const existing = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
-    if (existing.data.some(s => s.status === 'active' || s.status === 'trialing')) {
+    if (existing.data.some((s: { status: string }) => s.status === 'active' || s.status === 'trialing')) {
       await reconcileFromStripe(customerId);
       return void res.status(409).json({ error: 'You already have an active Pro subscription.' });
     }
@@ -136,7 +136,7 @@ router.post('/billing/portal', async (req: Request, res: Response) => {
 // the company. Self-heal path for when a webhook event was never delivered.
 async function reconcileFromStripe(customerId: string): Promise<void> {
   const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
-  const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+  const activeSub = subs.data.find((s: { status: string }) => s.status === 'active' || s.status === 'trialing');
   if (activeSub) {
     await syncSubscription(activeSub);
   } else if (subs.data.length > 0) {
