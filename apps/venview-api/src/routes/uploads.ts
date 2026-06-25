@@ -132,14 +132,74 @@ async function parseUploadToContent(file: Express.Multer.File): Promise<ParsedUp
   if (!text.trim()) throw new Error('Could not extract text from file');
 
   // Strip trailing empty columns from each row (Google Sheets exports ~87 trailing commas)
-  text = text.split('\n').map(row => {
+  const trimmedRows = text.split('\n').map(row => {
     const cols = row.split(',');
     let last = cols.length - 1;
     while (last >= 0 && !cols[last].trim().replace(/^"|"$/g, '')) last--;
     return cols.slice(0, last + 1).join(',');
-  }).filter(row => row.trim()).join('\n');
+  }).filter(row => row.trim());
+
+  // Detect side-by-side recipe blocks (Google Sheets tables arranged horizontally).
+  // When found, split into separate vertical sections so Claude can read each cleanly.
+  text = splitSideBySideBlocks(trimmedRows);
 
   return { isImage: false, extractedText: text, userContent: text };
+}
+
+// Detect Google-Sheets-style CSVs where multiple recipe tables are arranged
+// side-by-side in columns (separated by a wide block of empty cells). When
+// detected, extract each column-block as its own vertical section so Claude
+// can parse each table cleanly instead of seeing ~80 empty commas per row.
+function splitSideBySideBlocks(rows: string[]): string {
+  if (rows.length === 0) return '';
+
+  // Parse every row into an array of cell values.
+  const parsed = rows.map(r => r.split(','));
+  const maxCols = Math.max(...parsed.map(r => r.length));
+
+  if (maxCols < 15) return rows.join('\n'); // Too narrow to have side-by-side blocks.
+
+  // Mark which column indices have ANY non-empty content.
+  const hasContent = new Array<boolean>(maxCols).fill(false);
+  for (const row of parsed) {
+    for (let i = 0; i < row.length; i++) {
+      if (row[i]?.trim()) hasContent[i] = true;
+    }
+  }
+
+  // Walk across columns and group content-columns into blocks separated by
+  // gaps of >= GAP_THRESHOLD consecutive empty columns.
+  const GAP_THRESHOLD = 10;
+  const blocks: { start: number; end: number }[] = [];
+  let blockStart = -1;
+  let gapLen = 0;
+
+  for (let i = 0; i <= maxCols; i++) {
+    if (i < maxCols && hasContent[i]) {
+      if (blockStart === -1) blockStart = i;
+      gapLen = 0;
+    } else if (blockStart !== -1) {
+      gapLen++;
+      if (gapLen >= GAP_THRESHOLD || i === maxCols) {
+        blocks.push({ start: blockStart, end: i - gapLen });
+        blockStart = -1;
+        gapLen = 0;
+      }
+    }
+  }
+
+  if (blocks.length <= 1) return rows.join('\n'); // Single block — nothing to split.
+
+  // Extract each block and stack vertically with a separator.
+  const sections: string[] = [];
+  for (const blk of blocks) {
+    const section = parsed
+      .map(row => row.slice(blk.start, blk.end + 1).join(','))
+      .filter(r => r.replace(/,/g, '').trim()); // Drop rows with no content in this block.
+    if (section.length > 0) sections.push(section.join('\n'));
+  }
+
+  return sections.join('\n\n---\n\n');
 }
 
 type StreamParams = Parameters<Anthropic['messages']['stream']>[0];

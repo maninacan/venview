@@ -191,7 +191,8 @@ export function RecipesPage() {
       }
 
       if (!parsed.recipes?.length) {
-        showToast('No recipes found in that file. Try a different file.', 'warning');
+        parseError = true;
+        setStreamingError(`Claude could not find any recipes in this file.\n\nThe output above is what Claude returned. Check if your CSV has recognizable recipe names and ingredient rows.`);
         return;
       }
       setImportedRecipes(parsed.recipes.map(r => ({ ...r, tempId: crypto.randomUUID() })));
@@ -408,7 +409,7 @@ export function RecipesPage() {
             <div style={{ padding: '24px 28px 12px', flexShrink: 0 }}>
               <h3 style={{ margin: '0 0 4px', color: streamingError ? 'var(--danger)' : 'var(--vv-navy)' }}>
                 <i className={`fa-solid ${streamingError ? 'fa-triangle-exclamation' : 'fa-spinner fa-spin'}`} style={{ marginRight: 8 }} />
-                {streamingError ? 'Parse Error — Raw Output' : 'Claude is analyzing your file…'}
+                {streamingError ? 'No Recipes Found — Raw Output' : 'Claude is analyzing your file…'}
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>{streamingError ?? 'This may take 20–40 seconds for large files.'}</span>
