@@ -37,7 +37,7 @@ export const recipeResolvers = {
 
       const { data: recipe, error } = await supabase
         .from('RecipeCards')
-        .insert({ ...recipeFields, companyId, createdAt: new Date().toISOString() })
+        .insert({ ...recipeFields, companyId })
         .select()
         .single();
 
