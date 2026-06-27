@@ -37,7 +37,7 @@ export const recipeResolvers = {
 
       const { data: recipe, error } = await supabase
         .from('RecipeCards')
-        .insert({ ...recipeFields, companyId, userId: ctx.user!.id })
+        .insert({ ...recipeFields, companyId })
         .select()
         .single();
 
@@ -60,6 +60,50 @@ export const recipeResolvers = {
       const row = full as Record<string, unknown>;
       const ings = (row['RecipeIngredients'] as Array<Record<string, unknown>> ?? []);
       return { ...row, id: row['id'], totalCost: ings.reduce((s, i) => s + Number(i['quantity'] ?? 0) * Number(i['unitCost'] ?? 0), 0), ingredients: ings };
+    },
+
+    // Bulk variant used by the AI-import "Approve All" flow: creates many recipes
+    // in a fixed number of DB round-trips regardless of how many were parsed.
+    createRecipes: async (
+      _: unknown,
+      { companyId, inputs }: { companyId: string; inputs: Array<Record<string, unknown>> },
+      ctx: AppContext
+    ) => {
+      requireAuth(ctx);
+      await requireCompanyMember(companyId, ctx.user!.id);
+
+      if (!Array.isArray(inputs) || inputs.length === 0) return [];
+
+      // 1. Insert all recipe cards at once. PostgREST returns the inserted rows in
+      //    input order, so we can correlate them back to their ingredient lists by index.
+      const { data: cards, error: cardErr } = await supabase
+        .from('RecipeCards')
+        .insert(inputs.map(i => ({ name: i['name'], companyId })))
+        .select();
+
+      if (cardErr || !cards) throw new Error(cardErr?.message ?? 'Failed to create recipes');
+
+      // 2. Insert every recipe's ingredients in a single call, tagged with its recipeId.
+      const ingredientRows = cards.flatMap((card, idx) => {
+        const ings = (inputs[idx]?.['ingredients'] as Array<Record<string, unknown>> ?? []);
+        return ings.map(ing => ({ ...ing, recipeId: (card as Record<string, unknown>)['id'] }));
+      });
+      if (ingredientRows.length > 0) {
+        const { error: ingErr } = await supabase.from('RecipeIngredients').insert(ingredientRows);
+        if (ingErr) throw new Error(ingErr.message);
+      }
+
+      // 3. Re-fetch the created recipes with their ingredients for the response.
+      const ids = cards.map(c => (c as Record<string, unknown>)['id'] as string);
+      const { data: full } = await supabase
+        .from('RecipeCards')
+        .select('*, RecipeIngredients(*)')
+        .in('id', ids);
+
+      return (full ?? []).map((row: Record<string, unknown>) => {
+        const ings = (row['RecipeIngredients'] as Array<Record<string, unknown>> ?? []);
+        return { ...row, id: row['id'], totalCost: ings.reduce((s, i) => s + Number(i['quantity'] ?? 0) * Number(i['unitCost'] ?? 0), 0), ingredients: ings };
+      });
     },
 
     updateRecipe: async (

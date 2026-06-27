@@ -392,7 +392,7 @@ export function InventoryPage() {
                 <span>{streamingError ? 'Parse Error — Raw Output' : 'Claude is analyzing your file…'}</span>
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>{streamingError ?? 'This may take 20–40 seconds for large files.'}</span>
+                <span>{streamingError ?? 'This may take a few minutes for large files.'}</span>
                 {!streamingError && (
                   <span style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontSize: '0.88rem', color: 'var(--vv-navy)', fontWeight: 600 }}>
                     {`${Math.floor(streamingElapsed / 60)}:${String(streamingElapsed % 60).padStart(2, '0')}`}

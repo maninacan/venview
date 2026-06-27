@@ -609,6 +609,7 @@ export const typeDefs = `#graphql
 
     # Recipes
     createRecipe(companyId: ID!, input: CreateRecipeInput!): Recipe!
+    createRecipes(companyId: ID!, inputs: [CreateRecipeInput!]!): [Recipe!]!
     updateRecipe(id: ID!, input: CreateRecipeInput!): Recipe!
     deleteRecipe(id: ID!): Boolean!
 

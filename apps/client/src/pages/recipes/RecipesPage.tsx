@@ -19,6 +19,11 @@ const CREATE_RECIPE = gql`
     createRecipe(companyId: $companyId, input: $input) { id name totalCost ingredients { id name quantity unitCost unit } }
   }
 `;
+const CREATE_RECIPES = gql`
+  mutation CreateRecipes($companyId: ID!, $inputs: [CreateRecipeInput!]!) {
+    createRecipes(companyId: $companyId, inputs: $inputs) { id name totalCost ingredients { id name quantity unitCost unit } }
+  }
+`;
 const UPDATE_RECIPE = gql`
   mutation UpdateRecipe($id: ID!, $input: CreateRecipeInput!) {
     updateRecipe(id: $id, input: $input) { id name totalCost ingredients { id name quantity unitCost unit } }
@@ -38,6 +43,7 @@ export function RecipesPage() {
   const { companyId } = useCurrentCompany();
   const { data, loading, refetch } = useQuery(GET_RECIPES, { variables: { companyId }, skip: !companyId });
   const [createRecipe] = useMutation(CREATE_RECIPE);
+  const [createRecipes] = useMutation(CREATE_RECIPES);
   const [updateRecipe] = useMutation(UPDATE_RECIPE);
   const [deleteRecipe] = useMutation(DELETE_RECIPE);
 
@@ -237,24 +243,35 @@ export function RecipesPage() {
 
   async function handleApproveAll() {
     setApprovingAll(true);
+    // Coerce numbers to finite values — a NaN (e.g. an unparseable "$0.50") can't be
+    // serialized as a GraphQL Float! and would otherwise reject the whole request.
+    const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
     const inputs = importedRecipes.map(recipe => ({
       name: recipe.name.trim(),
       ingredients: recipe.ingredients
         .filter(i => i.name.trim())
-        .map(({ id: _id, ...i }) => ({ ...i, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })),
+        .map(({ id: _id, ...i }) => ({ ...i, quantity: num(i.quantity), unitCost: num(i.unitCost) })),
     }));
     let saved = 0, failed = 0;
     try {
-      // Save concurrently (capped) instead of one round-trip at a time.
-      const CONCURRENCY = 5;
-      const queue = [...inputs];
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-        let input: typeof inputs[number] | undefined;
-        while ((input = queue.shift()) !== undefined) {
-          try { await createRecipe({ variables: { companyId, input } }); saved++; }
-          catch { failed++; }
+      // Save in bulk — one mutation per chunk instead of one round-trip per recipe.
+      // Chunking keeps any single request bounded for very large imports.
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < inputs.length; i += CHUNK_SIZE) {
+        const chunk = inputs.slice(i, i + CHUNK_SIZE);
+        try {
+          const { data } = await createRecipes({ variables: { companyId, inputs: chunk } });
+          saved += data?.createRecipes?.length ?? chunk.length;
+        } catch (bulkErr) {
+          // Bulk failed for the whole chunk — fall back to saving each recipe on its
+          // own so one bad recipe (or an unavailable bulk endpoint) can't sink the rest.
+          console.error('Bulk createRecipes failed, falling back to per-recipe save:', bulkErr);
+          for (const input of chunk) {
+            try { await createRecipe({ variables: { companyId, input } }); saved++; }
+            catch (oneErr) { failed++; console.error('createRecipe failed:', input.name, oneErr); }
+          }
         }
-      }));
+      }
 
       refetch();
       if (failed === 0) {
@@ -412,7 +429,7 @@ export function RecipesPage() {
                 {streamingError ? 'No Recipes Found — Raw Output' : 'Claude is analyzing your file…'}
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>{streamingError ?? 'This may take 20–40 seconds for large files.'}</span>
+                <span>{streamingError ?? 'This may take a few minutes for large files.'}</span>
                 {!streamingError && (
                   <span style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontSize: '0.88rem', color: 'var(--vv-navy)', fontWeight: 600 }}>
                     {`${Math.floor(streamingElapsed / 60)}:${String(streamingElapsed % 60).padStart(2, '0')}`}
