@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
+import { BackToSetupButton } from '../../components/guidance/BackToSetupButton';
 import { showToast } from '@org/data';
 
 const GET_INVENTORY = gql`
@@ -275,6 +276,7 @@ export function InventoryPage() {
 
   return (
     <>
+      <BackToSetupButton />
       <div className="card">
         <div className="mb-4">
           <h2 className="mt-0 mb-1 text-[#0B2A4A]">📦 My Inventory{!loading && items.length > 0 && <span className="text-[#64748b] font-normal"> ({items.length})</span>}</h2>

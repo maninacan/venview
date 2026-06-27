@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
+import { BackToSetupButton } from '../../components/guidance/BackToSetupButton';
 import { showToast, useAuth } from '@org/data';
 import { PosMappingModal } from '../../components/modals/PosMappingModal';
 
@@ -161,11 +162,17 @@ export function SettingsPage() {
       showToast('✅ POS connected successfully! Your locations are now available.', 'success', 6000);
       setSearchParams({});
       refetch();
+      // Launched from the getting-started checklist (the ?setup=1 marker is lost
+      // across the OAuth round-trip, so it's stashed in sessionStorage) — return.
+      if (sessionStorage.getItem('venview_setup_return') === '1') {
+        sessionStorage.removeItem('venview_setup_return');
+        navigate(`/companies/${companyId}`);
+      }
     } else if (pos === 'error') {
       showToast('POS connection failed. Please try again.', 'error');
       setSearchParams({});
     }
-  }, [searchParams, setSearchParams, refetch]);
+  }, [searchParams, setSearchParams, refetch, navigate, companyId]);
 
   async function handleConnectPos() {
     setConnectingPos(true);
@@ -179,6 +186,8 @@ export function SettingsPage() {
       });
       const result = await res.json() as { url?: string; error?: string };
       if (!result.url) throw new Error(result.error ?? 'Failed to get OAuth URL');
+      // Remember to return to the setup checklist after the OAuth round-trip.
+      if (searchParams.get('setup') === '1') sessionStorage.setItem('venview_setup_return', '1');
       window.location.href = result.url;
     } catch (err) {
       showToast(err instanceof Error ? err.message : `Failed to connect ${posMeta.displayName}`, 'error');
@@ -206,6 +215,8 @@ export function SettingsPage() {
       showToast('Toast connected.', 'success');
       setToastGuid('');
       refetch();
+      // Auto-return to the checklist if this step was launched from setup.
+      if (searchParams.get('setup') === '1') navigate(`/companies/${companyId}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to connect Toast', 'error');
     } finally {
@@ -408,6 +419,7 @@ export function SettingsPage() {
 
   return (
     <>
+      <BackToSetupButton />
       {/* POS Integration */}
       <div className="card">
         <div style={{ marginBottom: 16 }}>

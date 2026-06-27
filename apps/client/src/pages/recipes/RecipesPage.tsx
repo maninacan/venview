@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
+import { BackToSetupButton } from '../../components/guidance/BackToSetupButton';
 import { showToast } from '@org/data';
 
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
@@ -287,6 +288,7 @@ export function RecipesPage() {
 
   return (
     <>
+      <BackToSetupButton />
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div>

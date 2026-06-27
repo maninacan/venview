@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
@@ -7,7 +7,7 @@ import { showToast } from '@org/data';
 
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
 
-const EVENT_RATING_OPTIONS = ['A', 'B', 'C', 'D', 'F'];
+const EVENT_RATING_OPTIONS = ['Family', 'Mature'];
 
 // ── GraphQL ──────────────────────────────────────────────────────────────────
 const GET_EVENT = gql`
@@ -82,6 +82,8 @@ export function AddEventPage() {
   const navigate = useNavigate();
   const { companyId } = useCurrentCompany();
   const { eventId } = useParams<{ eventId: string }>();
+  const [searchParams] = useSearchParams();
+  const fromSetup = searchParams.get('setup') === '1';
   const isEdit = !!eventId;
 
   const [form, setForm] = useState<EventFormState>(EMPTY_FORM);
@@ -191,9 +193,13 @@ export function AddEventPage() {
       const { data } = await createEvent({ variables: { companyId, input: buildInput() } });
       const newId = data.createEvent.id;
       showToast('Event created!', 'success');
+      // "Create & add details" always opens the edit form. Plain "Create event"
+      // launched from the setup checklist returns there to continue setup.
       navigate(addDetails
         ? `/companies/${companyId}/events/${newId}/edit`
-        : `/companies/${companyId}/events/${newId}`);
+        : fromSetup
+          ? `/companies/${companyId}`
+          : `/companies/${companyId}/events/${newId}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create event', 'error');
     } finally { setLoading(false); }

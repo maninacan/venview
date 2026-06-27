@@ -74,23 +74,23 @@ export function useCompanyJourney(companyId: string | null) {
     },
     {
       key: 'pos', label: `Connect ${posName}`, description: 'Auto-sync sales (and labor) from your POS.',
-      ctaLabel: `Connect ${posName}`, to: `/companies/${companyId}/settings`, done: posConnected, optional: true,
+      ctaLabel: `Connect ${posName}`, to: `/companies/${companyId}/settings?setup=1`, done: posConnected, optional: true,
     },
     {
       key: 'recipes', label: 'Add your recipes', description: 'Define ingredient costs so venOS can calculate COGS.',
-      ctaLabel: 'Add recipes', to: `/companies/${companyId}/recipes`, done: recipeCount > 0, optional: true,
+      ctaLabel: 'Add recipes', to: `/companies/${companyId}/recipes?setup=1`, done: recipeCount > 0, optional: true,
     },
     {
       key: 'inventory', label: 'Add your inventory', description: 'Import your product catalog to track stock and costs.',
-      ctaLabel: 'Add inventory', to: `/companies/${companyId}/inventory`, done: inventoryCount > 0, optional: true,
+      ctaLabel: 'Add inventory', to: `/companies/${companyId}/inventory?setup=1`, done: inventoryCount > 0, optional: true,
     },
     {
       key: 'team', label: 'Invite your team', description: 'Share events, inventory, and recipes with teammates.',
-      ctaLabel: 'Invite team', to: `/companies/${companyId}/settings#team-access`, done: memberCount > 1, optional: true,
+      ctaLabel: 'Invite team', to: `/companies/${companyId}/settings?setup=1#team-access`, done: memberCount > 1, optional: true,
     },
     {
       key: 'first-event', label: 'Create your first event', description: 'Add a market, festival, or pop-up to start tracking profit.',
-      ctaLabel: 'Create event', to: `/companies/${companyId}/events/new`, done: eventCount > 0, optional: false,
+      ctaLabel: 'Create event', to: `/companies/${companyId}/events/new?setup=1`, done: eventCount > 0, optional: false,
     },
   ];
 
