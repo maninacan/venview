@@ -54,7 +54,11 @@ export function AuthPage() {
     setLoading(true);
     try {
       if (mode === 'signup') {
-        const { data, error: authError } = await supabase.auth.signUp({ email, password });
+        const { data, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin + '/auth' },
+        });
         if (authError) {
           setError(authError.message || 'Authentication failed.');
         } else if (data.session) {
@@ -153,7 +157,11 @@ export function AuthPage() {
                   onClick={async e => {
                     e.preventDefault();
                     setResent(false);
-                    const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email });
+                    const { error: resendErr } = await supabase.auth.resend({
+                      type: 'signup',
+                      email,
+                      options: { emailRedirectTo: window.location.origin + '/auth' },
+                    });
                     if (resendErr) { setError(resendErr.message); }
                     else { setError(''); setResent(true); }
                   }}
