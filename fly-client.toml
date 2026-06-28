@@ -1,7 +1,7 @@
 # Production — client SPA (nginx). VITE_* values are baked in at build time via
 # --build-arg in the deploy workflow; nothing secret is needed at runtime.
 app = 'venview-client'
-primary_region = 'sjc'
+primary_region = 'dfw'
 
 [build]
   dockerfile = 'client.Dockerfile'
