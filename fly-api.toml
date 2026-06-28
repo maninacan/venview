@@ -8,7 +8,7 @@ primary_region = 'sjc'
 
 [env]
   PORT = '8080'
-  DOPPLER_PROJECT = 'venview'
+  DOPPLER_PROJECT = 'venos'
   DOPPLER_CONFIG = 'prd'
 
 [http_service]
