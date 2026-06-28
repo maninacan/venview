@@ -18,20 +18,16 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://venos.app/" />
+    <link rel="canonical" href="https://venview.io/" />
 
     <meta property="og:title" content={title} />
     <meta property="og:description" content="Stop guessing. See exactly where your money went after every event." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://venos.app/" />
+    <meta property="og:url" content="https://venview.io/" />
 
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/venview-icon.png" />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+    <link rel="apple-touch-icon" href="/venview-icon-lg.png" />
 
     <script async is:inline src="https://www.googletagmanager.com/gtag/js?id=G-7658VP10C6"></script>
     <script is:inline>
@@ -46,7 +42,13 @@ const {
 
     <nav>
       <div class="nav-inner">
-        <a href="/" class="logo">Ven<span>View</span></a>
+        <a href="/" class="brand">
+          <img src="/venview-icon-lg.png" alt="venOS" class="brand-icon" />
+          <span class="brand-text">
+            <span class="brand-name">venOS Events</span>
+            <span class="brand-tag">Vendor Intelligence for Events</span>
+          </span>
+        </a>
         <a href="#early-access" class="nav-cta">Get Early Access</a>
       </div>
     </nav>
@@ -64,73 +66,95 @@ const {
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --ink:   #0d0f12;
-    --ink2:  #2a2d35;
-    --muted: #6b7280;
-    --rule:  #e5e7eb;
-    --cream: #faf9f6;
+    /* venOS brand palette — matches the app design tokens */
+    --navy:        #0B2A4A;
+    --navy2:       #0A3A67;
+    --green:       #19B37A;
+    --green2:      #0F8F63;
+    --brand-green: #2E7D32;
+    --lemon:       #FFD84D;
+    --lemon2:      #FFC72C;
+    --cyan:        #00ABE2;
+    --cyan2:       #0085b0;
+
+    --ink:   #0B1B2B;
+    --ink2:  #334559;
+    --muted: #5B6B7C;
+    --rule:  #dde3f0;
+    --bg:    #F6FBFF;
     --white: #ffffff;
-    --gold:  #d4a017;
-    --gold2: #f0c040;
-    --green: #16a34a;
     --red:   #dc2626;
 
-    --font-head: 'Syne', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
+    /* The app uses a system font stack — no web fonts. */
+    --font-head: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+    --font-body: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
 
-    --max:    1080px;
-    --radius: 12px;
+    --max:       1080px;
+    --radius:    12px;
+    --radius-lg: 16px;
   }
 
   html { scroll-behavior: smooth; }
 
   body {
     font-family: var(--font-body);
-    background: var(--cream);
+    background: var(--bg);
     color: var(--ink);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ── Nav ─────────────────────────────────────────────── */
+  /* ── Nav (matches the app header) ────────────────────── */
   nav {
     position: sticky; top: 0; z-index: 100;
-    background: rgba(250,249,246,0.92);
-    backdrop-filter: blur(12px);
+    background: var(--white);
     border-bottom: 1px solid var(--rule);
+    box-shadow: 0 2px 6px rgba(11,42,74,0.08);
     padding: 0 24px;
   }
   .nav-inner {
     max-width: var(--max);
     margin: 0 auto;
-    height: 60px;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-  .logo {
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+  .brand-icon { height: 44px; width: auto; display: block; }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+  .brand-name {
     font-family: var(--font-head);
     font-weight: 800;
-    font-size: 1.25rem;
-    color: var(--ink);
-    text-decoration: none;
-    letter-spacing: -0.03em;
+    font-size: 1.12rem;
+    color: var(--brand-green);
+    letter-spacing: -0.01em;
   }
-  .logo span { color: var(--gold); }
+  .brand-tag { font-size: 0.66rem; color: #6b7280; }
   .nav-cta {
-    background: var(--ink);
+    background: var(--cyan);
     color: var(--white);
     font-family: var(--font-body);
-    font-size: 0.85rem;
-    font-weight: 500;
-    padding: 8px 20px;
-    border-radius: 100px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 8px;
     border: none;
     cursor: pointer;
     text-decoration: none;
-    transition: background 0.2s, transform 0.15s;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
   }
-  .nav-cta:hover { background: var(--gold); color: var(--ink); transform: translateY(-1px); }
+  .nav-cta:hover {
+    background: var(--cyan2);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0,171,226,0.28);
+  }
 
   /* ── Hero ────────────────────────────────────────────── */
   .hero {
@@ -147,11 +171,11 @@ const {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: #fef9c3;
-    border: 1px solid #fde047;
-    color: #854d0e;
+    background: #e6f7f0;
+    border: 1px solid rgba(25,179,122,0.35);
+    color: var(--green2);
     font-size: 0.78rem;
-    font-weight: 500;
+    font-weight: 600;
     padding: 5px 12px;
     border-radius: 100px;
     margin-bottom: 20px;
@@ -160,7 +184,7 @@ const {
   .hero-eyebrow::before {
     content: '';
     width: 7px; height: 7px;
-    background: var(--gold);
+    background: var(--green);
     border-radius: 50%;
     display: inline-block;
   }
@@ -170,13 +194,13 @@ const {
     font-size: clamp(2.2rem, 4.5vw, 3.2rem);
     font-weight: 800;
     line-height: 1.1;
-    letter-spacing: -0.04em;
-    color: var(--ink);
+    letter-spacing: -0.03em;
+    color: var(--navy);
     margin-bottom: 20px;
   }
   h1 em {
     font-style: normal;
-    color: var(--gold);
+    color: var(--brand-green);
     position: relative;
   }
   h1 em::after {
@@ -184,7 +208,7 @@ const {
     position: absolute;
     left: 0; bottom: -4px;
     width: 100%; height: 3px;
-    background: var(--gold2);
+    background: var(--lemon);
     border-radius: 2px;
   }
 
@@ -193,7 +217,6 @@ const {
     color: var(--ink2);
     line-height: 1.7;
     margin-bottom: 32px;
-    font-weight: 300;
   }
 
   /* ── Email Form ──────────────────────────────────────── */
@@ -219,15 +242,15 @@ const {
     transition: border-color 0.2s, box-shadow 0.2s;
   }
   .capture-form input[type="email"]:focus {
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px rgba(212,160,23,0.12);
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0,171,226,0.15);
   }
   .capture-form input[type="email"]::placeholder { color: #9ca3af; }
 
   .btn-primary {
-    background: var(--gold);
-    color: var(--ink);
-    font-family: var(--font-head);
+    background: var(--cyan);
+    color: var(--white);
+    font-family: var(--font-body);
     font-weight: 700;
     font-size: 0.95rem;
     padding: 14px 24px;
@@ -239,9 +262,9 @@ const {
     letter-spacing: -0.01em;
   }
   .btn-primary:hover {
-    background: var(--gold2);
+    background: var(--cyan2);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212,160,23,0.35);
+    box-shadow: 0 6px 20px rgba(0,171,226,0.32);
   }
   .btn-primary:active { transform: translateY(0); }
 
@@ -274,9 +297,9 @@ const {
   .dashboard-card {
     background: var(--white);
     border: 1px solid var(--rule);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: 28px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+    box-shadow: 0 20px 50px rgba(11,42,74,0.12), 0 4px 14px rgba(11,42,74,0.06);
     animation: float 4s ease-in-out infinite;
   }
   @keyframes float {
@@ -299,11 +322,11 @@ const {
   }
   .card-event {
     font-size: 0.78rem;
-    background: #fef9c3;
-    color: #854d0e;
+    background: #FFF6D6;
+    color: #8a6a00;
     padding: 3px 10px;
     border-radius: 100px;
-    font-weight: 500;
+    font-weight: 600;
   }
   .metric-row {
     display: grid;
@@ -312,7 +335,7 @@ const {
     margin-bottom: 16px;
   }
   .metric {
-    background: var(--cream);
+    background: var(--bg);
     border-radius: 10px;
     padding: 14px;
   }
@@ -330,11 +353,11 @@ const {
     font-weight: 700;
     letter-spacing: -0.03em;
   }
-  .metric-value.positive { color: var(--green); }
+  .metric-value.positive { color: var(--green2); }
   .metric-value.negative { color: var(--red); }
-  .metric-value.neutral  { color: var(--ink); }
+  .metric-value.neutral  { color: var(--navy); }
   .metric-delta { font-size: 0.72rem; margin-top: 2px; }
-  .metric-delta.up   { color: var(--green); }
+  .metric-delta.up   { color: var(--green2); }
   .metric-delta.down { color: var(--red); }
 
   .cost-breakdown {
@@ -349,13 +372,13 @@ const {
     font-size: 0.82rem;
   }
   .cost-name { color: var(--ink2); }
-  .cost-amount { font-weight: 500; font-family: var(--font-head); }
+  .cost-amount { font-weight: 600; font-family: var(--font-head); }
   .cost-amount.bad  { color: var(--red); }
-  .cost-amount.good { color: var(--green); }
+  .cost-amount.good { color: var(--green2); }
 
   .profit-bar-wrap {
     margin-top: 16px;
-    background: #f3f4f6;
+    background: #eef2f7;
     border-radius: 100px;
     height: 8px;
     overflow: hidden;
@@ -364,7 +387,7 @@ const {
   .profit-bar {
     height: 100%;
     width: 0;
-    background: linear-gradient(90deg, var(--gold), var(--gold2));
+    background: linear-gradient(90deg, var(--green2), var(--green));
     border-radius: 100px;
     transition: width 1.4s cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -372,19 +395,19 @@ const {
   .badge-float {
     position: absolute;
     top: -16px; right: -16px;
-    background: var(--ink);
+    background: var(--navy);
     color: var(--white);
     border-radius: 12px;
     padding: 10px 14px;
     font-size: 0.78rem;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    box-shadow: 0 8px 24px rgba(11,42,74,0.28);
     animation: pop-in 0.5s 0.8s both cubic-bezier(0.22,1,0.36,1);
   }
   .badge-float strong {
     display: block;
     font-family: var(--font-head);
     font-size: 1rem;
-    color: var(--gold2);
+    color: var(--lemon);
   }
   @keyframes pop-in {
     from { opacity: 0; transform: scale(0.7) translateY(8px); }
@@ -393,7 +416,7 @@ const {
 
   /* ── Pain Points ─────────────────────────────────────── */
   .pain-section {
-    background: var(--ink);
+    background: var(--navy);
     padding: 72px 24px;
     margin: 60px 0;
   }
@@ -405,9 +428,10 @@ const {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: var(--gold);
+    color: var(--green2);
     margin-bottom: 14px;
   }
+  .pain-inner .section-label { color: var(--lemon); }
   .pain-inner h2 {
     font-family: var(--font-head);
     font-size: clamp(1.8rem, 3.5vw, 2.6rem);
@@ -430,7 +454,7 @@ const {
     transition: border-color 0.2s, background 0.2s;
   }
   .pain-card:hover {
-    border-color: rgba(212,160,23,0.4);
+    border-color: rgba(255,216,77,0.45);
     background: rgba(255,255,255,0.03);
   }
   .pain-icon { font-size: 1.6rem; margin-bottom: 14px; display: block; }
@@ -442,7 +466,7 @@ const {
     margin-bottom: 8px;
     letter-spacing: -0.02em;
   }
-  .pain-card p { font-size: 0.88rem; color: rgba(255,255,255,0.55); line-height: 1.6; }
+  .pain-card p { font-size: 0.88rem; color: rgba(255,255,255,0.6); line-height: 1.6; }
 
   /* ── Features ────────────────────────────────────────── */
   .features-section {
@@ -458,6 +482,7 @@ const {
     margin-bottom: 48px;
     max-width: 480px;
     line-height: 1.15;
+    color: var(--navy);
   }
   .features-grid {
     display: grid;
@@ -474,13 +499,13 @@ const {
     transition: box-shadow 0.2s, transform 0.2s;
   }
   .feature-item:hover {
-    box-shadow: 0 8px 32px rgba(0,0,0,0.07);
+    box-shadow: 0 8px 32px rgba(11,42,74,0.10);
     transform: translateY(-2px);
   }
   .feature-dot {
     width: 36px; height: 36px;
     border-radius: 8px;
-    background: #fef9c3;
+    background: #e6f7f0;
     display: flex; align-items: center; justify-content: center;
     font-size: 1rem;
     flex-shrink: 0;
@@ -491,12 +516,13 @@ const {
     font-weight: 700;
     margin-bottom: 4px;
     letter-spacing: -0.02em;
+    color: var(--navy);
   }
   .feature-item p { font-size: 0.85rem; color: var(--muted); line-height: 1.55; }
 
   /* ── CTA Section ─────────────────────────────────────── */
   .cta-section {
-    background: linear-gradient(135deg, #0d0f12 0%, #1c1f26 100%);
+    background: linear-gradient(135deg, #0B2A4A 0%, #0A3A67 100%);
     padding: 80px 24px;
     text-align: center;
   }
@@ -510,10 +536,10 @@ const {
     line-height: 1.15;
     margin-bottom: 16px;
   }
-  .cta-section h2 span { color: var(--gold2); }
+  .cta-section h2 span { color: var(--lemon); }
   .cta-section > .cta-inner > p {
     font-size: 1rem;
-    color: rgba(255,255,255,0.55);
+    color: rgba(255,255,255,0.6);
     margin-bottom: 32px;
   }
   .cta-form {
@@ -526,17 +552,20 @@ const {
     flex: 1;
     padding: 14px 18px;
     border-radius: var(--radius);
-    border: 1.5px solid rgba(255,255,255,0.12);
-    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.08);
     color: var(--white);
     font-family: var(--font-body);
     font-size: 0.95rem;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .cta-form input[type="email"]:focus { border-color: var(--gold); }
-  .cta-form input[type="email"]::placeholder { color: rgba(255,255,255,0.3); }
-  .cta-note { font-size: 0.78rem; color: rgba(255,255,255,0.35); }
+  .cta-form input[type="email"]:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0,171,226,0.25);
+  }
+  .cta-form input[type="email"]::placeholder { color: rgba(255,255,255,0.4); }
+  .cta-note { font-size: 0.78rem; color: rgba(255,255,255,0.4); }
 
   /* ── Footer ──────────────────────────────────────────── */
   footer {
@@ -556,6 +585,7 @@ const {
     .features-grid { grid-template-columns: 1fr; }
     .form-row { flex-direction: column; }
     .cta-form { flex-direction: column; }
+    .brand-tag { display: none; }
   }
 
   /* ── Animations ──────────────────────────────────────── */
