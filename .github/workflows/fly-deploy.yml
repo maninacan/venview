@@ -25,10 +25,10 @@ jobs:
       super-admin-portal: ${{ steps.check.outputs.super-admin-portal }}
       marketing: ${{ steps.check.outputs.marketing }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: api-deploy-group
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy API
         # API secrets are injected at runtime via Doppler (DOPPLER_TOKEN is a Fly
@@ -99,9 +99,9 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: client-deploy-group
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - uses: dopplerhq/cli-action@v3
+      - uses: dopplerhq/cli-action@v4
       - name: Deploy Client
         # `doppler run` injects VITE_* into the inner shell; flyctl bakes them
         # into the static bundle via --build-arg. The token (prod/dev) selects values.
@@ -123,9 +123,9 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: super-admin-portal-deploy-group
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - uses: dopplerhq/cli-action@v3
+      - uses: dopplerhq/cli-action@v4
       - name: Deploy Super Admin Portal
         run: |
           CONFIG=$([[ "${GITHUB_REF##*/}" == "main" ]] && echo fly-super-admin-portal.toml || echo fly-dev-super-admin-portal.toml)
@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: marketing-deploy-group
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy Marketing
         # Astro site is fully static (no VITE_/PUBLIC_ build args), so no Doppler needed.
