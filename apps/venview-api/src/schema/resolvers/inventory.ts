@@ -123,7 +123,7 @@ export const inventoryResolvers = {
       await requireCompanyMember(companyId, ctx.user!.id);
 
       // Map 'name' → 'itemName' for the DB column
-      const dbInput: Record<string, unknown> = { ...input, companyId, updatedAt: new Date().toISOString() };
+      const dbInput: Record<string, unknown> = { ...input, companyId, userId: ctx.user!.id, updatedAt: new Date().toISOString() };
       if ('name' in dbInput) { dbInput['itemName'] = dbInput['name']; delete dbInput['name']; }
 
       // Upsert by itemName within company so re-imports update rather than duplicate

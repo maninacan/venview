@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase.js';
 import { decryptToken } from '../../lib/crypto.js';
 import { lookupTaxRates } from '../../lib/taxRates.js';
 import { providerForCompany, type PosEvent } from '../../lib/pos/index.js';
+import logger from '../../lib/logger.js';
 
 // Resolve the POS provider a company has chosen (null for manual / unset).
 async function companyProvider(companyId: string) {
@@ -220,7 +221,10 @@ export const salesResolvers = {
       await requireCompanyMember(companyId, ctx.user!.id);
       const provider = await companyProvider(companyId);
       if (!provider || !provider.implemented) return [];
-      try { return await provider.listLocations(companyId); } catch { return []; }
+      try { return await provider.listLocations(companyId); } catch (err) {
+        logger.error('posLocations: failed to fetch locations', { companyId, error: err });
+        return [];
+      }
     },
 
     posCatalog: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
@@ -228,7 +232,10 @@ export const salesResolvers = {
       await requireCompanyMember(companyId, ctx.user!.id);
       const provider = await companyProvider(companyId);
       if (!provider || !provider.implemented) return [];
-      try { return await provider.listCatalog(companyId); } catch { return []; }
+      try { return await provider.listCatalog(companyId); } catch (err) {
+        logger.error('posCatalog: failed to fetch catalog', { companyId, error: err });
+        return [];
+      }
     },
   },
 };

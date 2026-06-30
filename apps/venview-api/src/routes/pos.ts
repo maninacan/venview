@@ -32,7 +32,10 @@ router.get('/pos/:provider/oauth/start', async (req: Request, res: Response) => 
     await supabase.from('OAuthState').delete().lt('createdAt', new Date(Date.now() - 15 * 60 * 1000).toISOString());
     const state = randomBytes(24).toString('hex');
     const { error: insertErr } = await supabase.from('OAuthState').insert({ state, companyId, userId: ctx.user.id, provider });
-    if (insertErr) return void res.status(500).json({ error: 'Failed to start OAuth' });
+    if (insertErr) {
+      logger.error('pos.oauth.start: OAuthState insert failed', { error: insertErr, companyId, provider });
+      return void res.status(500).json({ error: 'Failed to start OAuth' });
+    }
 
     const url = await adapter.getAuthUrl(companyId, state);
     res.json({ url });

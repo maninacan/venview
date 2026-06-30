@@ -21,6 +21,16 @@ const clientOrigin = process.env['CLIENT_URL'] ?? 'http://localhost:4200';
 const superAdminOrigin = process.env['SUPER_ADMIN_URL'] ?? 'http://localhost:4202';
 const marketingOrigin = process.env['MARKETING_URL'] ?? 'http://localhost:4321';
 
+const allowedOrigins = [
+  clientOrigin,
+  superAdminOrigin,
+  marketingOrigin,
+  'https://studio.apollographql.com',
+  'https://venview.io',
+  'https://www.venview.io',
+  'https://venview-client.vercel.app',
+];
+
 async function main() {
   const app = express();
   const httpServer = http.createServer(app);
@@ -36,7 +46,7 @@ async function main() {
 
   app.use(
     cors({
-      origin: [clientOrigin, superAdminOrigin, marketingOrigin, 'https://studio.apollographql.com'],
+      origin: allowedOrigins,
       credentials: true,
     })
   );

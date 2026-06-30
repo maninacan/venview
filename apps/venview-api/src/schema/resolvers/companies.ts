@@ -75,7 +75,6 @@ export const companyResolvers = {
           ownerId: ctx.user.id,
           joinCode,
           plan: 'starter',
-          createdAt: new Date().toISOString(),
         })
         .select()
         .single();

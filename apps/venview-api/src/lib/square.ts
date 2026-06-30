@@ -71,12 +71,13 @@ export async function getSquareToken(companyId: string): Promise<string> {
   const accessEnc = row['accessToken'] as string | null;
   if (!accessEnc) throw new Error('Square connection has no access token. Please reconnect.');
 
-  // Proactively refresh if token is expiring within 30 days
+  // Proactively refresh if token is expiring within 7 days (Square tokens last 30 days,
+  // so 30-day window means every call would refresh, causing race conditions).
   const expiresAt = row['expiresAt'] as string | null;
   if (expiresAt && row['refreshToken']) {
     const expiresDate = new Date(expiresAt);
-    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    if (expiresDate < thirtyDaysFromNow) {
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (expiresDate < sevenDaysFromNow) {
       return refreshSquareToken(companyId, row);
     }
   }

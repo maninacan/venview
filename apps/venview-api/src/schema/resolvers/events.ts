@@ -289,7 +289,7 @@ export const eventResolvers = {
 
       const { data: event, error } = await supabase
         .from('EventInfo')
-        .insert({ ...eventFields, companyId, userId: ctx.user!.id, createdAt: new Date().toISOString() })
+        .insert({ ...eventFields, companyId, userId: ctx.user!.id })
         .select()
         .single();
 
