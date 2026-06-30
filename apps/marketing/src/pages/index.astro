@@ -188,6 +188,15 @@ import Layout from '../layouts/Layout.astro';
   }, { threshold: 0.1 });
   document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
 
+  // The marketing site is fully static, so the waitlist POST goes to the
+  // venview-api, resolved from the current host (prod / dev / local).
+  function apiBase(): string {
+    const h = window.location.hostname;
+    if (h === 'venview.io' || h === 'www.venview.io') return 'https://api.venview.io';
+    if (h === 'dev.venview.io') return 'https://api.dev.venview.io';
+    return 'http://localhost:3000';
+  }
+
   // Email capture
   async function submitEmail(source: string) {
     const emailInput = document.getElementById(`${source}-email`) as HTMLInputElement;
@@ -205,7 +214,7 @@ import Layout from '../layouts/Layout.astro';
     }
 
     try {
-      const res = await fetch('/api/waitlist', {
+      const res = await fetch(apiBase() + '/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, source }),

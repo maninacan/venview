@@ -11,6 +11,7 @@ import healthRouter from './routes/health.js';
 import posRouter from './routes/pos.js';
 import uploadsRouter from './routes/uploads.js';
 import billingRouter from './routes/billing.js';
+import waitlistRouter from './routes/waitlist.js';
 import logger from './lib/logger.js';
 
 const host = process.env['HOST'] ?? '0.0.0.0';
@@ -18,6 +19,7 @@ const port = process.env['PORT'] ? Number(process.env['PORT']) : 8080;
 
 const clientOrigin = process.env['CLIENT_URL'] ?? 'http://localhost:4200';
 const superAdminOrigin = process.env['SUPER_ADMIN_URL'] ?? 'http://localhost:4202';
+const marketingOrigin = process.env['MARKETING_URL'] ?? 'http://localhost:4321';
 
 async function main() {
   const app = express();
@@ -34,7 +36,7 @@ async function main() {
 
   app.use(
     cors({
-      origin: [clientOrigin, superAdminOrigin, 'https://studio.apollographql.com'],
+      origin: [clientOrigin, superAdminOrigin, marketingOrigin, 'https://studio.apollographql.com'],
       credentials: true,
     })
   );
@@ -65,6 +67,7 @@ async function main() {
   app.use('/api', posRouter);
   app.use('/api', uploadsRouter);
   app.use('/api', billingRouter);
+  app.use('/api', waitlistRouter);
 
   // GraphQL endpoint
   app.use(
