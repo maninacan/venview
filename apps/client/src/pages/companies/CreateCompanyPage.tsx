@@ -79,6 +79,7 @@ export function CreateCompanyPage() {
               <label>Company Name *</label>
               <input
                 type="text"
+                autoComplete="organization"
                 placeholder="e.g. Lemon Drip Food Co."
                 value={form.name}
                 onChange={e => update('name', e.target.value)}
@@ -98,6 +99,7 @@ export function CreateCompanyPage() {
               <label>Contact Name</label>
               <input
                 type="text"
+                autoComplete="name"
                 placeholder="Owner / contact name"
                 value={form.contactName}
                 onChange={e => update('contactName', e.target.value)}
@@ -120,6 +122,7 @@ export function CreateCompanyPage() {
                 </select>
                 <input
                   type="tel"
+                  autoComplete="tel-national"
                   placeholder="(555) 555-5555"
                   value={form.phone}
                   onChange={e => update('phone', e.target.value)}
@@ -131,6 +134,7 @@ export function CreateCompanyPage() {
               <label>Email</label>
               <input
                 type="email"
+                autoComplete="email"
                 placeholder="contact@yourcompany.com"
                 value={form.email}
                 onChange={e => update('email', e.target.value)}
