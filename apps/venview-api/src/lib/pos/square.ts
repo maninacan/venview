@@ -108,7 +108,12 @@ export const squareProvider: PosProvider = {
     do {
       const ordersResponse = await client.orders.search({
         locationIds: [locationId],
-        query: { filter: { dateTimeFilter: { createdAt: { startAt, endAt } }, stateFilter: { states: ['COMPLETED' as const] } } },
+        query: {
+          filter: { dateTimeFilter: { createdAt: { startAt, endAt } }, stateFilter: { states: ['COMPLETED' as const] } },
+          // Square requires a sort whose field matches the date_time_filter
+          // (created_at); omitting it makes the API reject an empty sort_field.
+          sort: { sortField: 'CREATED_AT' as const, sortOrder: 'ASC' as const },
+        },
         ...(cursor ? { cursor } : {}),
       });
       for (const order of ordersResponse.orders ?? []) allOrders.push(order as unknown as Record<string, unknown>);
