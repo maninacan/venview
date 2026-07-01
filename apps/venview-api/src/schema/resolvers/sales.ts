@@ -4,6 +4,16 @@ import { supabase } from '../../lib/supabase.js';
 import { decryptToken } from '../../lib/crypto.js';
 import { lookupTaxRates } from '../../lib/taxRates.js';
 import { providerForCompany, type PosEvent } from '../../lib/pos/index.js';
+import { isPosAuthError } from '../../lib/pos/types.js';
+
+// Flag/clear the POS connection so the UI can prompt a reconnect only when a
+// real auth failure has occurred (cleared on the next successful sync/reconnect).
+async function markPosNeedsReauth(companyId: string, provider: string, value: boolean) {
+  await supabase.from('PosConnection')
+    .update({ needsReauth: value })
+    .eq('companyId', companyId)
+    .eq('provider', provider);
+}
 import logger from '../../lib/logger.js';
 
 // Resolve the POS provider a company has chosen (null for manual / unset).
@@ -134,7 +144,18 @@ export const salesResolvers = {
       if (!provider || !provider.implemented) throw new Error('No POS is connected for this company.');
       if (!provider.capabilities.sales) throw new Error(`${provider.displayName} doesn't support sales sync.`);
 
-      const pull = await provider.pullSales(companyId, event as unknown as PosEvent);
+      let pull;
+      try {
+        pull = await provider.pullSales(companyId, event as unknown as PosEvent);
+      } catch (err) {
+        if (isPosAuthError(err)) {
+          await markPosNeedsReauth(companyId, provider.key, true);
+          logger.warn('syncSales: POS auth failure', { companyId, provider: provider.key });
+          throw new Error(`Your ${provider.displayName} connection has expired or was disconnected. Please reconnect ${provider.displayName} in Settings.`);
+        }
+        throw err;
+      }
+      await markPosNeedsReauth(companyId, provider.key, false);
 
       // Match items to inventory via POS mappings.
       const { data: mappings } = await supabase
@@ -191,7 +212,18 @@ export const salesResolvers = {
       if (!provider || !provider.implemented) throw new Error('No POS is connected for this company.');
       if (!provider.capabilities.labor) throw new Error(`${provider.displayName} doesn't support labor import.`);
 
-      const pull = await provider.pullLabor(companyId, event as unknown as PosEvent);
+      let pull;
+      try {
+        pull = await provider.pullLabor(companyId, event as unknown as PosEvent);
+      } catch (err) {
+        if (isPosAuthError(err)) {
+          await markPosNeedsReauth(companyId, provider.key, true);
+          logger.warn('syncLabor: POS auth failure', { companyId, provider: provider.key });
+          throw new Error(`Your ${provider.displayName} connection has expired or was disconnected. Please reconnect ${provider.displayName} in Settings.`);
+        }
+        throw err;
+      }
+      await markPosNeedsReauth(companyId, provider.key, false);
       const laborRows = pull.rows.map(r => ({ eventID: eventId, name: r.name, hours: r.hours, wage: r.wage }));
 
       await supabase.from('EventLabor').delete().eq('eventID', eventId);

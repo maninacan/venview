@@ -440,6 +440,8 @@ export const typeDefs = `#graphql
     provider: String
     locationName: String
     locationId: String
+    "True when the last POS API call failed auth — the user should reconnect."
+    needsReauth: Boolean
   }
 
   type PosLocation {

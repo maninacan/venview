@@ -27,7 +27,9 @@
     "connect": "Conectar {{name}}",
     "connectHelpLabor": "Conecta tu cuenta de {{name}} para sincronizar automáticamente ventas, ubicaciones y personal.",
     "connectHelpNoLabor": "Conecta tu cuenta de {{name}} para sincronizar automáticamente ventas y ubicaciones.",
-    "comingSoonMessage": "La compatibilidad con {{name}} estará disponible próximamente."
+    "comingSoonMessage": "La compatibilidad con {{name}} estará disponible próximamente.",
+    "reconnect": "🔄 Reconectar {{name}}",
+    "reauthWarning": "Tu conexión de {{name}} dejó de funcionar (puede haber caducado o sido revocada). Reconéctala para seguir sincronizando ventas y mano de obra."
   },
   "taxjar": {
     "name": "TaxJar",

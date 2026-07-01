@@ -93,3 +93,15 @@ export function buildDateWindow(event: PosEvent): { startAt: string; endAt: stri
 
 // Thrown when a capability isn't supported by the company's provider.
 export class PosUnsupportedError extends Error {}
+
+// True when a provider API error is an authentication failure (dead/revoked/
+// wrong-app token) — i.e. the user needs to reconnect the POS.
+export function isPosAuthError(err: unknown): boolean {
+  const e = err as { statusCode?: number; message?: unknown; errors?: Array<{ category?: string; code?: string }> } | null;
+  if (!e) return false;
+  if (e.statusCode === 401) return true;
+  const msg = typeof e.message === 'string' ? e.message : '';
+  if (/status code:\s*401/i.test(msg) || /AUTHENTICATION_ERROR|UNAUTHORIZED/i.test(msg)) return true;
+  if (Array.isArray(e.errors) && e.errors.some(x => x?.category === 'AUTHENTICATION_ERROR' || x?.code === 'UNAUTHORIZED')) return true;
+  return false;
+}

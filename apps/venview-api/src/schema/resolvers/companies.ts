@@ -504,19 +504,20 @@ export const companyResolvers = {
       // Only 'manual'/unset means definitively no provider; otherwise look up the connection.
       const { data } = await supabase
         .from('PosConnection')
-        .select('provider, locationId, locationName')
+        .select('provider, locationId, locationName, needsReauth')
         .eq('companyId', company['id'])
         .order('createdAt', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (!data) return { connected: false, provider };
+      if (!data) return { connected: false, provider, needsReauth: false };
       const row = data as Record<string, unknown>;
       return {
         connected: true,
         provider: (row['provider'] as string) ?? provider,
         locationId: row['locationId'],
         locationName: row['locationName'],
+        needsReauth: !!row['needsReauth'],
       };
     },
   },

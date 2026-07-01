@@ -27,7 +27,9 @@
     "connect": "Connect {{name}}",
     "connectHelpLabor": "Connect your {{name}} account to automatically sync sales, locations, and labor.",
     "connectHelpNoLabor": "Connect your {{name}} account to automatically sync sales and locations.",
-    "comingSoonMessage": "{{name}} support is coming soon."
+    "comingSoonMessage": "{{name}} support is coming soon.",
+    "reconnect": "🔄 Reconnect {{name}}",
+    "reauthWarning": "Your {{name}} connection stopped working (it may have expired or been revoked). Reconnect to keep syncing sales and labor."
   },
   "taxjar": {
     "name": "TaxJar",

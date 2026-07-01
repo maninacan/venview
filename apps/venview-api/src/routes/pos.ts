@@ -117,6 +117,7 @@ async function handleCallback(req: Request, res: Response, providerOverride?: st
       locationId: tokens.locationId ?? null,
       locationName: tokens.locationName ?? null,
       expiresAt: tokens.expiresAt ?? null,
+      needsReauth: false,
     }, { onConflict: 'companyId,provider' });
     if (upsertErr) logger.error('pos.oauth.callback: save failed', { companyId, provider, error: upsertErr.message });
 

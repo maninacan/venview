@@ -16,7 +16,7 @@ const GET_SETTINGS = gql`
       id name phone contactName vendorCategory email joinCode plan pendingOwnerId taxjarConnected posSystem
       members { userId email role }
       pendingRequests { userId email role }
-      posStatus { connected provider locationName locationId }
+      posStatus { connected provider locationName locationId needsReauth }
     }
   }
 `;
@@ -458,14 +458,27 @@ export function SettingsPage() {
           </div>
 
           {posStatus?.connected ? (
-            <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => setShowPosMappings(true)}>
-                {t('integrations.manageMappings', '🗺 Manage POS Mappings')}
-              </button>
-              <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleDisconnectPos}>
-                {t('integrations.disconnect', 'Disconnect {{name}}', { name: posMeta.displayName })}
-              </button>
-            </div>
+            <>
+              {posStatus.needsReauth && provider !== 'toast' && (
+                <div style={{ marginTop: 14, borderRadius: 10, border: '1px solid #fde68a', background: '#fffbeb', padding: '12px 14px' }}>
+                  <p style={{ margin: '0 0 10px', fontSize: '0.84rem', color: '#92400e' }}>
+                    ⚠️ {t('integrations.reauthWarning', 'Your {{name}} connection stopped working (it may have expired or been revoked). Reconnect to keep syncing sales and labor.', { name: posMeta.displayName })}
+                  </p>
+                  <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleConnectPos} disabled={connectingPos}>
+                    {connectingPos && <span className="spinner" />}
+                    <span>{t('integrations.reconnect', '🔄 Reconnect {{name}}', { name: posMeta.displayName })}</span>
+                  </button>
+                </div>
+              )}
+              <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => setShowPosMappings(true)}>
+                  {t('integrations.manageMappings', '🗺 Manage POS Mappings')}
+                </button>
+                <button className="btn-danger-subtle" style={{ fontSize: '0.85rem' }} onClick={handleDisconnectPos}>
+                  {t('integrations.disconnect', 'Disconnect {{name}}', { name: posMeta.displayName })}
+                </button>
+              </div>
+            </>
           ) : provider === 'toast' ? (
             <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div className="form-group" style={{ margin: 0 }}>
