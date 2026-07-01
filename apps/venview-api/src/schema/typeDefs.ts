@@ -8,6 +8,8 @@ export const typeDefs = `#graphql
     email: String!
     isSuperAdmin: Boolean!
     companies: [Company!]!
+    "Companies the user has requested to join but that are awaiting owner approval."
+    pendingCompanies: [Company!]!
   }
 
   # ─── Company ─────────────────────────────────────────────────────────────────

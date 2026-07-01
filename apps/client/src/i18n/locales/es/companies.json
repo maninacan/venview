@@ -30,5 +30,10 @@
     "invalidJoinCode": "Código de acceso no válido",
     "created": "¡Empresa \"{{name}}\" creada!",
     "createFailed": "No se pudo crear la empresa"
+  },
+  "pending": {
+    "badge": "Pendiente de aprobación",
+    "hint": "Tu solicitud para unirte está pendiente de la aprobación del propietario.",
+    "aria": "{{name}} — pendiente de aprobación"
   }
 }

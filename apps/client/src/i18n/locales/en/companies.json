@@ -30,5 +30,10 @@
     "invalidJoinCode": "Invalid join code",
     "created": "Company \"{{name}}\" created!",
     "createFailed": "Failed to create company"
+  },
+  "pending": {
+    "badge": "Awaiting approval",
+    "hint": "Your request to join is pending the owner’s approval.",
+    "aria": "{{name}} — awaiting approval"
   }
 }

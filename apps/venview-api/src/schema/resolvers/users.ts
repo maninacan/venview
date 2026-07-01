@@ -9,13 +9,12 @@ export const userResolvers = {
 
       const { data: memberships } = await supabase
         .from('CompanyMembers')
-        .select('companyId, role')
+        .select('companyId, role, status')
         .eq('userId', ctx.user.id)
-        .eq('status', 'active');
+        .in('status', ['active', 'pending']);
 
-      const ids = (memberships ?? [])
-        .map((m: Record<string, unknown>) => m['companyId'])
-        .filter(Boolean);
+      const all = (memberships ?? []) as Array<Record<string, unknown>>;
+      const ids = all.map(m => m['companyId']).filter(Boolean);
 
       const { data: companiesData } = ids.length > 0
         ? await supabase.from('Companies').select('*').in('id', ids)
@@ -25,19 +24,22 @@ export const userResolvers = {
         (companiesData ?? []).map((c: Record<string, unknown>) => [String(c['id']), c])
       );
 
-      const companyList = (memberships ?? [])
-        .map((row: Record<string, unknown>) => {
-          const company = companyMap.get(String(row['companyId']));
-          if (!company) return null;
-          return { ...company, myRole: row['role'] };
-        })
-        .filter(Boolean);
+      const buildList = (status: string) =>
+        all
+          .filter(row => row['status'] === status)
+          .map(row => {
+            const company = companyMap.get(String(row['companyId']));
+            if (!company) return null;
+            return { ...company, myRole: row['role'] };
+          })
+          .filter(Boolean);
 
       return {
         id: ctx.user.id,
         email: ctx.user.email,
         isSuperAdmin: ctx.isSuperAdmin,
-        companies: companyList,
+        companies: buildList('active'),
+        pendingCompanies: buildList('pending'),
       };
     },
   },

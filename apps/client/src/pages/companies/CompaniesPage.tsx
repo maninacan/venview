@@ -14,6 +14,9 @@ const GET_MY_COMPANIES = gql`
         id name vendorCategory plan
         members { userId role }
       }
+      pendingCompanies {
+        id name vendorCategory plan
+      }
     }
   }
 `;
@@ -34,6 +37,7 @@ export function CompaniesPage() {
   const [requestAccess] = useMutation(REQUEST_ACCESS);
 
   const companies = data?.me?.companies ?? [];
+  const pendingCompanies = data?.me?.pendingCompanies ?? [];
 
   async function handleJoin(e: FormEvent) {
     e.preventDefault();
@@ -71,6 +75,10 @@ export function CompaniesPage() {
 
         {!loading && companies.map((c: Parameters<typeof CompanyCard>[0]['company']) => (
           <CompanyCard key={c.id} company={c} />
+        ))}
+
+        {!loading && pendingCompanies.map((c: Parameters<typeof CompanyCard>[0]['company']) => (
+          <CompanyCard key={c.id} company={c} pending />
         ))}
 
         <Link
