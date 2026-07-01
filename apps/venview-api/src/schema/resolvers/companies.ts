@@ -93,8 +93,10 @@ export const companyResolvers = {
 
       // Best-effort welcome email — never block company creation on email.
       if (ctx.user.email) {
-        const companyName = (company as Record<string, unknown>)['name'] as string;
-        sendWelcomeEmail(ctx.user.email, companyName).catch(err =>
+        const companyRow = company as Record<string, unknown>;
+        const companyName = companyRow['name'] as string;
+        const newCompanyId = companyRow['id'] as string;
+        sendWelcomeEmail(ctx.user.email, companyName, newCompanyId).catch(err =>
           logger.error('createCompany: welcome email failed', {
             error: err instanceof Error ? err.message : String(err),
           })

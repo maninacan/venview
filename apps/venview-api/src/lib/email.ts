@@ -111,16 +111,17 @@ const linkFallback = (url: string) =>
 /**
  * Branded welcome email sent when a new company is created. Best-effort.
  */
-export async function sendWelcomeEmail(to: string, companyName: string): Promise<boolean> {
+export async function sendWelcomeEmail(to: string, companyName: string, companyId: string): Promise<boolean> {
   const clientUrl = process.env['CLIENT_URL'] ?? 'https://app.venview.io';
+  const companyUrl = `${clientUrl}/companies/${companyId}`;
   const company = escapeHtml(companyName);
   const html = shell(
     heading('Welcome to venOS! 🎉') +
     para(`Your company <strong>${company}</strong> is ready. venOS helps event vendors know if they actually made money — track sales, costs, and true profit for every market, festival, and pop-up.`) +
     para('The fastest way to see it in action: add a recent event and open its Profit Summary.') +
-    brandButton(clientUrl, 'Open venOS')
+    brandButton(companyUrl, 'Open venOS')
   );
-  const text = `Welcome to venOS!\n\nYour company ${companyName} is ready. venOS helps event vendors track sales, costs, and true profit for every event.\n\nOpen venOS: ${clientUrl}`;
+  const text = `Welcome to venOS!\n\nYour company ${companyName} is ready. venOS helps event vendors track sales, costs, and true profit for every event.\n\nOpen venOS: ${companyUrl}`;
   return sendEmail({ to, subject: 'Welcome to venOS 🎉', html, text });
 }
 
