@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase, showToast, useAuth } from '@org/data';
 import { AlertsBell } from './AlertsBell';
-import venviewLogo from '../../assets/venview-icon-lg.png';
+import venviewLogo from '../../assets/venOS-logo.jpg';
 
 interface Props {
   companyId?: string;

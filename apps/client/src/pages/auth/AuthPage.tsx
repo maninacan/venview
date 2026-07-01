@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@org/data';
-import venviewLogo from '../../assets/venview-icon-lg.png';
+import venviewLogo from '../../assets/venOS-logo.jpg';
 
 type AuthMode = 'signin' | 'signup';
 
