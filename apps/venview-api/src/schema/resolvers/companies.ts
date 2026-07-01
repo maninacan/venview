@@ -4,6 +4,8 @@ import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
 import { encryptToken } from '../../lib/crypto.js';
 import { verifyTaxjarToken } from '../../lib/taxRates.js';
+import { sendWelcomeEmail } from '../../lib/email.js';
+import logger from '../../lib/logger.js';
 
 function generateJoinCode(): string {
   return randomBytes(3).toString('hex').toUpperCase().slice(0, 6);
@@ -88,6 +90,16 @@ export const companyResolvers = {
         role: 'owner',
         joinedAt: new Date().toISOString(),
       });
+
+      // Best-effort welcome email — never block company creation on email.
+      if (ctx.user.email) {
+        const companyName = (company as Record<string, unknown>)['name'] as string;
+        sendWelcomeEmail(ctx.user.email, companyName).catch(err =>
+          logger.error('createCompany: welcome email failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+      }
 
       return company;
     },
