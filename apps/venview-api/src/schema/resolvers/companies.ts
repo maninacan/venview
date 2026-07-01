@@ -4,7 +4,7 @@ import { requireAuth, requireCompanyMember } from '../../context/index.js';
 import { supabase } from '../../lib/supabase.js';
 import { encryptToken } from '../../lib/crypto.js';
 import { verifyTaxjarToken } from '../../lib/taxRates.js';
-import { sendWelcomeEmail } from '../../lib/email.js';
+import { sendWelcomeEmail, sendJoinRequestEmail } from '../../lib/email.js';
 import logger from '../../lib/logger.js';
 
 function generateJoinCode(): string {
@@ -139,7 +139,7 @@ export const companyResolvers = {
 
       const { data: company, error } = await supabase
         .from('Companies')
-        .select('id, name')
+        .select('id, name, ownerId')
         .eq('joinCode', joinCode.toUpperCase())
         .single();
 
@@ -147,6 +147,7 @@ export const companyResolvers = {
 
       const companyId = (company as Record<string, unknown>)['id'] as string;
       const companyName = (company as Record<string, unknown>)['name'] as string;
+      const ownerId = (company as Record<string, unknown>)['ownerId'] as string;
 
       // Already has a row? Report its current status instead of duplicating.
       const { data: existing } = await supabase
@@ -168,6 +169,25 @@ export const companyResolvers = {
         status: 'pending',
         joinedAt: new Date().toISOString(),
       });
+
+      // Best-effort: notify the owner so they can approve/deny in team settings.
+      if (ownerId) {
+        supabase.auth.admin.getUserById(ownerId)
+          .then(({ data }) => {
+            const ownerEmail = data?.user?.email;
+            if (ownerEmail) {
+              return sendJoinRequestEmail(ownerEmail, {
+                companyId,
+                companyName,
+                requesterEmail: ctx.user.email || undefined,
+              });
+            }
+            return false;
+          })
+          .catch(err => logger.error('requestAccess: join-request email failed', {
+            error: err instanceof Error ? err.message : String(err),
+          }));
+      }
 
       return { companyName, status: 'pending' };
     },
