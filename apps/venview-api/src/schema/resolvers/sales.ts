@@ -14,6 +14,30 @@ async function markPosNeedsReauth(companyId: string, provider: string, value: bo
     .eq('companyId', companyId)
     .eq('provider', provider);
 }
+
+// Best-effort: add any synced team members not already on the company's employee
+// roster (EmployeeTracker), seeding their default wage from the timecard. Never
+// blocks the labor sync.
+async function upsertRosterFromLabor(companyId: string, rows: Array<{ name: string; wage: number }>) {
+  try {
+    const byName = new Map<string, number>();
+    for (const r of rows) {
+      const n = (r.name ?? '').trim();
+      if (n && !byName.has(n)) byName.set(n, r.wage ?? 0);
+    }
+    if (byName.size === 0) return;
+    const { data: existing } = await supabase.from('EmployeeTracker').select('name').eq('companyId', companyId);
+    const have = new Set((existing ?? []).map((e: Record<string, unknown>) => String(e['name'] ?? '').toLowerCase()));
+    const toInsert = [...byName.entries()]
+      .filter(([name]) => !have.has(name.toLowerCase()))
+      .map(([name, wage]) => ({ companyId, name, defaultWage: wage }));
+    if (toInsert.length > 0) await supabase.from('EmployeeTracker').insert(toInsert);
+  } catch (err) {
+    logger.warn('syncLabor: roster auto-populate failed', {
+      companyId, error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 import logger from '../../lib/logger.js';
 
 // Resolve the POS provider a company has chosen (null for manual / unset).
@@ -228,6 +252,9 @@ export const salesResolvers = {
 
       await supabase.from('EventLabor').delete().eq('eventID', eventId);
       if (laborRows.length > 0) await supabase.from('EventLabor').insert(laborRows);
+
+      // Seed the employee roster with any new team members from this sync.
+      await upsertRosterFromLabor(companyId, pull.rows);
 
       return { success: true, message: `Synced ${laborRows.length} timecard(s).`, unmatchedCount: 0 };
     },

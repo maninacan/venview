@@ -16,6 +16,23 @@ const SQUARE_SCOPES = [
   'ORDERS_READ', 'PAYMENTS_READ', 'MERCHANT_PROFILE_READ', 'ITEMS_READ',
 ].join(' ');
 
+// Fallback when a location has no timezone / the lookup fails. US vendor app,
+// so a US zone beats UTC (which would shift the reporting-day window ~6-7h).
+const DEFAULT_TZ = 'America/Denver';
+
+// Resolve the Square location's IANA timezone so the sales/labor window aligns
+// to the merchant's local business day (matching Square's reporting day).
+async function getLocationTimeZone(companyId: string, locationId: string): Promise<string> {
+  try {
+    const client = await getSquareClient(companyId);
+    const res = await client.locations.get({ locationId });
+    const tz = (res.location as Record<string, unknown> | null)?.['timezone'] as string | undefined;
+    return tz || DEFAULT_TZ;
+  } catch {
+    return DEFAULT_TZ;
+  }
+}
+
 export const squareProvider: PosProvider = {
   key: 'square',
   displayName: 'Square',
@@ -101,54 +118,71 @@ export const squareProvider: PosProvider = {
     const locationId = event.posLocationId;
     if (!locationId) throw new Error('Event has no POS location linked. Edit the event and select a location first.');
     const client = await getSquareClient(companyId);
-    const { startAt, endAt } = buildDateWindow(event);
+    const token = await getSquareToken(companyId);
+    const timeZone = await getLocationTimeZone(companyId, locationId);
+    const { startAt, endAt } = buildDateWindow(event, timeZone);
 
+    // Orders via raw HTTP: the SDK intermittently serializes an empty sort_field
+    // on orders.search (Square then 400s). Build the request explicitly, as the
+    // prior working app did. Raw responses are snake_case with integer-cent amounts.
     const allOrders: Array<Record<string, unknown>> = [];
     let cursor: string | undefined;
     do {
-      const ordersResponse = await client.orders.search({
-        locationIds: [locationId],
+      const body: Record<string, unknown> = {
+        location_ids: [locationId],
         query: {
-          filter: { dateTimeFilter: { createdAt: { startAt, endAt } }, stateFilter: { states: ['COMPLETED' as const] } },
-          // Square requires a sort whose field matches the date_time_filter
-          // (created_at); omitting it makes the API reject an empty sort_field.
-          sort: { sortField: 'CREATED_AT' as const, sortOrder: 'ASC' as const },
+          filter: { date_time_filter: { created_at: { start_at: startAt, end_at: endAt } }, state_filter: { states: ['COMPLETED'] } },
+          sort: { sort_field: 'CREATED_AT', sort_order: 'ASC' },
         },
-        ...(cursor ? { cursor } : {}),
+      };
+      if (cursor) body['cursor'] = cursor;
+      const res = await axios.post(`${getSquareBaseUrl()}/v2/orders/search`, body, {
+        headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2025-01-15', 'Content-Type': 'application/json' },
       });
-      for (const order of ordersResponse.orders ?? []) allOrders.push(order as unknown as Record<string, unknown>);
-      cursor = ordersResponse.cursor ?? undefined;
+      const data = res.data as { orders?: Array<Record<string, unknown>>; cursor?: string };
+      for (const order of data.orders ?? []) allOrders.push(order);
+      cursor = data.cursor;
     } while (cursor);
 
     const allPayments: Array<Record<string, unknown>> = [];
     const paymentsPage = await client.payments.list({ locationId, beginTime: startAt, endTime: endAt });
     for await (const payment of paymentsPage) allPayments.push(payment as unknown as Record<string, unknown>);
 
-    let grossSales = 0, discounts = 0, tips = 0, taxCollected = 0;
+    const amt = (m: unknown): number => Number((m as { amount?: number | bigint } | null)?.amount ?? 0);
+
+    let grossSales = 0, discounts = 0, tips = 0, taxCollected = 0, refunds = 0;
     const itemMap = new Map<string, { name: string; qty: number }>();
     for (const order of allOrders) {
-      const totalMoney = order['totalMoney'] as { amount?: bigint } | null;
-      const discountMoney = order['totalDiscountMoney'] as { amount?: bigint } | null;
-      const tipMoney = order['totalTipMoney'] as { amount?: bigint } | null;
-      const taxMoney = order['totalTaxMoney'] as { amount?: bigint } | null;
-      grossSales += (Number(totalMoney?.amount ?? 0) - Number(taxMoney?.amount ?? 0) - Number(tipMoney?.amount ?? 0)) / 100;
-      discounts += Number(discountMoney?.amount ?? 0) / 100;
-      tips += Number(tipMoney?.amount ?? 0) / 100;
-      taxCollected += Number(taxMoney?.amount ?? 0) / 100;
-      for (const item of (order['lineItems'] as Array<Record<string, unknown>> | null) ?? []) {
+      // Gross = true item sales (pre-discount/return/tax/tip), summed per line
+      // item from gross_sales_money (fallback total_money, then base_price × qty).
+      for (const item of (order['line_items'] as Array<Record<string, unknown>> | null) ?? []) {
         const name = (item['name'] as string ?? '').trim();
         const qty = Number(item['quantity'] ?? 0);
-        if (!name) continue;
-        itemMap.set(name, { name, qty: (itemMap.get(name)?.qty ?? 0) + qty });
+        const giAmt = (item['gross_sales_money'] as { amount?: number } | null)?.amount;
+        const tmAmt = (item['total_money'] as { amount?: number } | null)?.amount;
+        const bpAmt = (item['base_price_money'] as { amount?: number } | null)?.amount;
+        const cents = giAmt != null ? Number(giAmt)
+          : tmAmt != null ? Number(tmAmt)
+          : Number(bpAmt ?? 0) * qty;
+        grossSales += cents / 100;
+        if (name) itemMap.set(name, { name, qty: (itemMap.get(name)?.qty ?? 0) + qty });
+      }
+      discounts += amt(order['total_discount_money']) / 100;
+      tips += amt(order['total_tip_money']) / 100;
+      taxCollected += amt(order['total_tax_money']) / 100;
+      // Returns/refunds recorded on the order.
+      refunds += amt((order['return_amounts'] as { total_money?: unknown } | null)?.total_money) / 100;
+      // Auto-gratuity service charges are tips too (card tips arrive via total_tip_money).
+      for (const sc of (order['service_charges'] as Array<Record<string, unknown>> | null) ?? []) {
+        if (sc['type'] === 'AUTO_GRATUITY') tips += amt(sc['total_money']) / 100;
       }
     }
 
-    let processingFees = 0, totalCollected = 0, refunds = 0;
+    let processingFees = 0, totalCollected = 0;
     for (const payment of allPayments) {
-      totalCollected += Number((payment['amountMoney'] as { amount?: bigint } | null)?.amount ?? 0) / 100;
-      refunds += Number((payment['refundedMoney'] as { amount?: bigint } | null)?.amount ?? 0) / 100;
-      for (const fee of (payment['processingFee'] as Array<{ effectiveMoney?: { amount?: bigint } }> | null) ?? []) {
-        processingFees += Math.abs(Number(fee.effectiveMoney?.amount ?? 0)) / 100;
+      totalCollected += amt(payment['amountMoney']) / 100;
+      for (const fee of (payment['processingFee'] as Array<{ amountMoney?: { amount?: bigint } }> | null) ?? []) {
+        processingFees += Math.abs(Number(fee.amountMoney?.amount ?? 0)) / 100;
       }
     }
 
@@ -163,46 +197,48 @@ export const squareProvider: PosProvider = {
     const locationId = event.posLocationId;
     if (!locationId) throw new Error('Event has no POS location linked.');
     const client = await getSquareClient(companyId);
-    const { startAt, endAt } = buildDateWindow(event);
+    const timeZone = await getLocationTimeZone(companyId, locationId);
+    // Local calendar dates for the workday filter (interpreted in the location tz).
+    const { startDate, endDate } = buildDateWindow(event, timeZone);
 
     const allTimecards: Array<Record<string, unknown>> = [];
     let cursor: string | undefined;
-    const startDate = startAt.split('T')[0];
-    const endDate = endAt.split('T')[0];
     do {
       const response = await client.labor.searchTimecards({
-        query: { filter: { locationIds: [locationId], workday: { dateRange: { startDate, endDate }, matchTimecardsBy: 'START_AT' } } },
+        query: { filter: { locationIds: [locationId], workday: { dateRange: { startDate, endDate }, matchTimecardsBy: 'START_AT', defaultTimezone: timeZone }, status: 'CLOSED' } },
         ...(cursor ? { cursor } : {}),
       });
       for (const tc of response.timecards ?? []) allTimecards.push(tc as unknown as Record<string, unknown>);
       cursor = response.cursor ?? undefined;
     } while (cursor);
 
-    const memberWageMap = new Map<string, { name: string; wage: number }>();
+    // Resolve team-member display names once per member.
     const memberIds = [...new Set(allTimecards.map(tc => tc['teamMemberId'] as string).filter(Boolean))];
+    const nameMap = new Map<string, string>();
     await Promise.all(memberIds.map(async memberId => {
       try {
-        const wagesPage = await client.labor.teamMemberWages.list({ teamMemberId: memberId, limit: 1 });
-        const wage = (wagesPage.data ?? [])[0] as Record<string, unknown> | undefined;
-        const hourlyRate = wage ? Number((wage['hourlyRate'] as { amount?: bigint } | null)?.amount ?? 0) / 100 : 0;
         const memberResponse = await client.teamMembers.get({ teamMemberId: memberId });
         const member = memberResponse.teamMember as Record<string, unknown> | null;
-        const name = member ? `${member['givenName'] ?? ''} ${member['familyName'] ?? ''}`.trim() || memberId : memberId;
-        memberWageMap.set(memberId, { name, wage: hourlyRate });
+        nameMap.set(memberId, member ? `${member['givenName'] ?? ''} ${member['familyName'] ?? ''}`.trim() || memberId : memberId);
       } catch {
-        memberWageMap.set(memberId, { name: memberId, wage: 0 });
+        nameMap.set(memberId, memberId);
       }
     }));
 
+    // Current Square Labor API timecards carry startAt/endAt and the shift wage
+    // directly (the old clockInEvent/clockOutEvent shape no longer exists).
     const rows = allTimecards.map(tc => {
       const memberId = tc['teamMemberId'] as string;
-      const clockInEvent = tc['clockInEvent'] as Record<string, unknown> | null;
-      const clockOutEvent = tc['clockOutEvent'] as Record<string, unknown> | null;
-      const clockIn = new Date(clockInEvent?.['createdAt'] as string ?? startAt);
-      const clockOut = clockOutEvent ? new Date(clockOutEvent['createdAt'] as string) : new Date();
-      const hours = Math.round((clockOut.getTime() - clockIn.getTime()) / 36000) / 100;
-      const member = memberWageMap.get(memberId) ?? { name: memberId, wage: 0 };
-      return { name: member.name, hours, wage: member.wage };
+      const startStr = tc['startAt'] as string | null;
+      const endStr = tc['endAt'] as string | null;
+      const start = startStr ? new Date(startStr) : null;
+      const end = endStr ? new Date(endStr) : null;
+      const hours = start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())
+        ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 36000) / 100)
+        : 0;
+      const hourly = (tc['wage'] as { hourlyRate?: { amount?: bigint } } | null)?.hourlyRate;
+      const wage = hourly ? Number(hourly.amount ?? 0) / 100 : 0;
+      return { name: nameMap.get(memberId) ?? memberId, hours, wage };
     });
 
     return { rows };
