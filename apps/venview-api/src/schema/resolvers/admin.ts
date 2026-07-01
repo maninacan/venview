@@ -314,6 +314,19 @@ export const adminResolvers = {
         })),
       }));
     },
+
+    waitlistSignups: async (_: unknown, __: unknown, ctx: AppContext) => {
+      requireAuth(ctx);
+      if (!ctx.isSuperAdmin) throw new Error('Forbidden');
+
+      const { data, error } = await supabase
+        .from('Waitlist')
+        .select('id, email, source, createdAt')
+        .order('createdAt', { ascending: false });
+
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
   },
 
   Mutation: {

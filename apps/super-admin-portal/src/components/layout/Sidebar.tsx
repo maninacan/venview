@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/companies', label: 'Companies' },
+  { to: '/waitlist', label: 'Waitlist' },
 ];
 
 const linkBase = 'block px-[14px] py-[9px] rounded-lg text-[0.88rem] font-medium text-[#64748b] no-underline transition-colors hover:bg-[#f1f5f9] hover:text-[#0B2A4A]';

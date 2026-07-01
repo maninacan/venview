@@ -461,6 +461,14 @@ export const typeDefs = `#graphql
     memberCount: Int!
   }
 
+  type WaitlistSignup {
+    id: ID!
+    email: String!
+    "Which marketing form the email came from ('hero' | 'cta'), if known."
+    source: String
+    createdAt: String
+  }
+
   type MonthCount {
     month: String!
     count: Int!
@@ -549,6 +557,7 @@ export const typeDefs = `#graphql
     adminUsers: [AdminUser!]!
     adminDashboard: AdminDashboard!
     companiesInState(state: String!): [CompanyLocation!]!
+    waitlistSignups: [WaitlistSignup!]!
   }
 
   # ─── Mutations ───────────────────────────────────────────────────────────────
