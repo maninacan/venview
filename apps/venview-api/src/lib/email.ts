@@ -75,8 +75,8 @@ export async function sendWelcomeEmail(to: string, companyName: string): Promise
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;">
       <tr><td align="center">
         <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(11,42,74,0.08);">
-          <tr><td style="background:#0B2A4A;padding:28px 32px;">
-            <span style="color:#ffffff;font-size:20px;font-weight:700;">venOS</span>
+          <tr><td style="background:#0B2A4A;padding:22px 32px;">
+            <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.01em;">ven<span style="color:#FFD84D;">OS</span></span>
           </td></tr>
           <tr><td style="padding:32px;">
             <h1 style="margin:0 0 12px;font-size:22px;color:#0B2A4A;">Welcome to venOS! 🎉</h1>
