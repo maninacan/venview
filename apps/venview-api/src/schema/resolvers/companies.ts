@@ -194,6 +194,63 @@ export const companyResolvers = {
       return { companyName, status: 'pending' };
     },
 
+    // Re-notify the owner about the caller's own PENDING join request.
+    // Rate-limited to one reminder per company per REMINDER_COOLDOWN_MS.
+    remindJoinRequest: async (_: unknown, { companyId }: { companyId: string }, ctx: AppContext) => {
+      requireAuth(ctx);
+
+      const { data: membership } = await supabase
+        .from('CompanyMembers')
+        .select('status, lastRemindedAt')
+        .eq('companyId', companyId)
+        .eq('userId', ctx.user.id)
+        .single();
+
+      const row = membership as Record<string, unknown> | null;
+      if (!row || row['status'] !== 'pending') {
+        throw new Error('No pending join request found for this company.');
+      }
+
+      const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000; // once per day
+      const last = row['lastRemindedAt'] as string | null;
+      if (last) {
+        const elapsed = Date.now() - new Date(last).getTime();
+        if (elapsed < REMINDER_COOLDOWN_MS) {
+          const hrs = Math.ceil((REMINDER_COOLDOWN_MS - elapsed) / (60 * 60 * 1000));
+          throw new Error(`You already sent a reminder recently. You can send another in about ${hrs} hour${hrs === 1 ? '' : 's'}.`);
+        }
+      }
+
+      const { data: company } = await supabase
+        .from('Companies').select('name, ownerId').eq('id', companyId).single();
+      if (!company) throw new Error('Company not found');
+      const companyName = (company as Record<string, unknown>)['name'] as string;
+      const ownerId = (company as Record<string, unknown>)['ownerId'] as string;
+
+      const { data: ownerData } = await supabase.auth.admin.getUserById(ownerId);
+      const ownerEmail = ownerData?.user?.email;
+      const sent = ownerEmail
+        ? await sendJoinRequestEmail(ownerEmail, {
+            companyId,
+            companyName,
+            requesterEmail: ctx.user.email || undefined,
+            reminder: true,
+          })
+        : false;
+
+      // Only start the cooldown once a reminder actually went out, so a transient
+      // email failure doesn't lock the user out for a day.
+      if (!sent) throw new Error('Could not send the reminder right now. Please try again later.');
+
+      const now = new Date().toISOString();
+      await supabase.from('CompanyMembers')
+        .update({ lastRemindedAt: now })
+        .eq('companyId', companyId)
+        .eq('userId', ctx.user.id);
+
+      return { ok: true, lastRemindedAt: now };
+    },
+
     // Owner approves a pending access request, promoting it to an active member.
     approveMember: async (
       _: unknown,

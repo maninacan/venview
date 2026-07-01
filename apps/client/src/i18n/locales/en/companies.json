@@ -29,11 +29,16 @@
     "accessRequested": "Access requested for {{name}} — pending owner approval.",
     "invalidJoinCode": "Invalid join code",
     "created": "Company \"{{name}}\" created!",
-    "createFailed": "Failed to create company"
+    "createFailed": "Failed to create company",
+    "reminderSent": "Reminder sent to the owner.",
+    "reminderFailed": "Could not send reminder."
   },
   "pending": {
     "badge": "Awaiting approval",
     "hint": "Your request to join is pending the owner’s approval.",
-    "aria": "{{name}} — awaiting approval"
+    "aria": "{{name}} — awaiting approval",
+    "remind": "Send reminder",
+    "reminding": "Sending…",
+    "remindAgainIn": "Remind again in {{time}}"
   }
 }

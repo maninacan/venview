@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useMutation } from '@apollo/client/react';
+import { gql } from '@apollo/client/core';
+import { showToast } from '@org/data';
 
 interface Company {
   id: string;
@@ -7,6 +11,7 @@ interface Company {
   vendorCategory?: string | null;
   plan: string;
   members?: Array<unknown>;
+  lastRemindedAt?: string | null;
 }
 
 interface Props {
@@ -15,13 +20,45 @@ interface Props {
   pending?: boolean;
 }
 
+// Keep in sync with REMINDER_COOLDOWN_MS in apps/venview-api (remindJoinRequest).
+const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const REMIND_JOIN_REQUEST = gql`
+  mutation RemindJoinRequest($companyId: ID!) {
+    remindJoinRequest(companyId: $companyId) { ok lastRemindedAt }
+  }
+`;
+
+function formatRemaining(ms: number): string {
+  const totalMin = Math.ceil(ms / 60000);
+  if (totalMin >= 60) return `${Math.ceil(totalMin / 60)}h`;
+  return `${totalMin}m`;
+}
+
 export function CompanyCard({ company, pending }: Props) {
   const navigate = useNavigate();
   const { t } = useTranslation('companies');
+  const [remind, { loading: reminding }] = useMutation(REMIND_JOIN_REQUEST);
+  const [lastReminded, setLastReminded] = useState<string | null>(company.lastRemindedAt ?? null);
 
   // Pending: the user isn't a member yet, so the card is non-interactive and
   // visually distinct — dashed border, reduced opacity, and an amber status badge.
   if (pending) {
+    const remainingMs = lastReminded
+      ? new Date(lastReminded).getTime() + REMINDER_COOLDOWN_MS - Date.now()
+      : 0;
+    const cooling = remainingMs > 0;
+
+    async function handleRemind() {
+      try {
+        const { data } = await remind({ variables: { companyId: company.id } });
+        setLastReminded(data?.remindJoinRequest?.lastRemindedAt ?? new Date().toISOString());
+        showToast(t('toast.reminderSent', 'Reminder sent to the owner.'), 'success');
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : t('toast.reminderFailed', 'Could not send reminder.'), 'error');
+      }
+    }
+
     return (
       <div
         className="bg-white border-2 border-dashed border-[rgba(11,42,74,0.22)] rounded-[14px] p-[22px] relative min-h-[150px] flex flex-col opacity-70"
@@ -34,10 +71,23 @@ export function CompanyCard({ company, pending }: Props) {
         <div className="text-[0.78rem] text-[#94a3b8] mb-3">
           {t('pending.hint', 'Your request to join is pending the owner’s approval.')}
         </div>
-        <div className="mt-auto">
+        <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1 text-[0.75rem] font-semibold px-[9px] py-[3px] rounded-full bg-[#fef3c7] text-[#92400e]">
             ⏳ {t('pending.badge', 'Awaiting approval')}
           </span>
+          <button
+            type="button"
+            onClick={handleRemind}
+            disabled={reminding || cooling}
+            title={cooling ? t('pending.remindAgainIn', 'Remind again in {{time}}', { time: formatRemaining(remainingMs) }) : undefined}
+            className="text-[0.75rem] font-semibold text-[#0B2A4A] underline decoration-dotted underline-offset-2 disabled:no-underline disabled:text-[#94a3b8] disabled:cursor-not-allowed"
+          >
+            {reminding
+              ? t('pending.reminding', 'Sending…')
+              : cooling
+                ? t('pending.remindAgainIn', 'Remind again in {{time}}', { time: formatRemaining(remainingMs) })
+                : t('pending.remind', 'Send reminder')}
+          </button>
         </div>
       </div>
     );

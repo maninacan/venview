@@ -15,7 +15,7 @@ const GET_MY_COMPANIES = gql`
         members { userId role }
       }
       pendingCompanies {
-        id name vendorCategory plan
+        id name vendorCategory plan lastRemindedAt
       }
     }
   }

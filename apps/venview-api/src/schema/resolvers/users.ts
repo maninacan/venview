@@ -9,7 +9,7 @@ export const userResolvers = {
 
       const { data: memberships } = await supabase
         .from('CompanyMembers')
-        .select('companyId, role, status')
+        .select('companyId, role, status, lastRemindedAt')
         .eq('userId', ctx.user.id)
         .in('status', ['active', 'pending']);
 
@@ -30,7 +30,7 @@ export const userResolvers = {
           .map(row => {
             const company = companyMap.get(String(row['companyId']));
             if (!company) return null;
-            return { ...company, myRole: row['role'] };
+            return { ...company, myRole: row['role'], lastRemindedAt: row['lastRemindedAt'] ?? null };
           })
           .filter(Boolean);
 

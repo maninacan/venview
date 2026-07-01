@@ -29,11 +29,16 @@
     "accessRequested": "Se solicitó acceso a {{name}}: pendiente de aprobación del propietario.",
     "invalidJoinCode": "Código de acceso no válido",
     "created": "¡Empresa \"{{name}}\" creada!",
-    "createFailed": "No se pudo crear la empresa"
+    "createFailed": "No se pudo crear la empresa",
+    "reminderSent": "Recordatorio enviado al propietario.",
+    "reminderFailed": "No se pudo enviar el recordatorio."
   },
   "pending": {
     "badge": "Pendiente de aprobación",
     "hint": "Tu solicitud para unirte está pendiente de la aprobación del propietario.",
-    "aria": "{{name}} — pendiente de aprobación"
+    "aria": "{{name}} — pendiente de aprobación",
+    "remind": "Enviar recordatorio",
+    "reminding": "Enviando…",
+    "remindAgainIn": "Recordar de nuevo en {{time}}"
   }
 }

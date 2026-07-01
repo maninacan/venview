@@ -39,6 +39,14 @@ export const typeDefs = `#graphql
     posSystem: String
     "Onboarding answer: 'pos' | 'other' | 'flat_rate'."
     laborMethod: String
+    "For a pending company (from pendingCompanies): when the current user last reminded the owner; null otherwise."
+    lastRemindedAt: String
+  }
+
+  type RemindResult {
+    ok: Boolean!
+    "When the reminder was sent — drives the client-side cooldown."
+    lastRemindedAt: String!
   }
 
   type AccessRequestResult {
@@ -597,6 +605,8 @@ export const typeDefs = `#graphql
     updateCompany(id: ID!, input: UpdateCompanyInput!): Company!
     deleteCompany(id: ID!): Boolean!
     requestAccess(joinCode: String!): AccessRequestResult!
+    "Re-notify the owner about a pending join request. Rate-limited server-side."
+    remindJoinRequest(companyId: ID!): RemindResult!
     approveMember(companyId: ID!, userId: ID!): Boolean!
     inviteMember(companyId: ID!, email: String!): InviteResult!
     setCompanyProfile(companyId: ID!, posSystem: String, laborMethod: String): Company!

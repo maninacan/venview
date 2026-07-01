@@ -131,18 +131,25 @@ export async function sendWelcomeEmail(to: string, companyName: string, companyI
  */
 export async function sendJoinRequestEmail(
   to: string,
-  opts: { companyId: string; companyName: string; requesterEmail?: string }
+  opts: { companyId: string; companyName: string; requesterEmail?: string; reminder?: boolean }
 ): Promise<boolean> {
   const clientUrl = process.env['CLIENT_URL'] ?? 'https://app.venview.io';
   const teamUrl = `${clientUrl}/companies/${opts.companyId}/settings#team-access`;
   const company = escapeHtml(opts.companyName);
   const requester = opts.requesterEmail ? escapeHtml(opts.requesterEmail) : 'Someone';
+  const title = opts.reminder ? `Reminder: request to join ${company}` : `New request to join ${company}`;
+  const intro = opts.reminder
+    ? `Just a reminder — <strong>${requester}</strong> is still waiting to join your company on venOS. Approve or deny the request from your team settings.`
+    : `<strong>${requester}</strong> has requested to join your company on venOS. Review the request and approve or deny it from your team settings.`;
   const html = shell(
-    heading(`New request to join ${company}`) +
-    para(`<strong>${requester}</strong> has requested to join your company on venOS. Review the request and approve or deny it from your team settings.`) +
+    heading(title) +
+    para(intro) +
     brandButton(teamUrl, 'Review request') +
     linkFallback(teamUrl)
   );
-  const text = `${opts.requesterEmail ?? 'Someone'} has requested to join ${opts.companyName} on venOS.\n\nReview the request (approve or deny) here: ${teamUrl}`;
-  return sendEmail({ to, subject: `New request to join ${opts.companyName}`, html, text });
+  const subject = opts.reminder
+    ? `Reminder: request to join ${opts.companyName}`
+    : `New request to join ${opts.companyName}`;
+  const text = `${opts.requesterEmail ?? 'Someone'} is waiting to join ${opts.companyName} on venOS.\n\nReview the request (approve or deny) here: ${teamUrl}`;
+  return sendEmail({ to, subject, html, text });
 }
