@@ -44,18 +44,19 @@ export const squareProvider: PosProvider = {
       access_token: string; refresh_token: string; merchant_id: string; expires_at: string;
     };
 
-    // Best-effort: fetch first location for display.
+    // Best-effort: fetch first location for display + its currency.
     let locationId: string | null = null;
     let locationName: string | null = null;
+    let currency: string | null = null;
     try {
       const locRes = await axios.get(`${getSquareBaseUrl()}/v2/locations`, {
         headers: { Authorization: `Bearer ${access_token}`, 'Square-Version': '2025-01-15' },
       });
       const locs = locRes.data?.locations ?? [];
-      if (locs.length > 0) { locationId = locs[0].id; locationName = locs[0].name; }
+      if (locs.length > 0) { locationId = locs[0].id; locationName = locs[0].name; currency = locs[0].currency ?? null; }
     } catch { /* non-fatal */ }
 
-    return { accessToken: access_token, refreshToken: refresh_token, externalId: merchant_id, locationId, locationName, expiresAt: expires_at };
+    return { accessToken: access_token, refreshToken: refresh_token, externalId: merchant_id, locationId, locationName, currency, expiresAt: expires_at };
   },
 
   async revoke(companyId) {
@@ -72,7 +73,7 @@ export const squareProvider: PosProvider = {
     const response = await client.locations.list();
     return (response.locations ?? []).map((loc) => {
       const l = loc as Record<string, unknown>;
-      return { id: l['id'] as string, name: l['name'] as string };
+      return { id: l['id'] as string, name: l['name'] as string, currency: (l['currency'] as string) ?? null };
     });
   },
 

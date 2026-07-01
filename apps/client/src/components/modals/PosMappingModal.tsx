@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
+import { useTranslation, Trans } from 'react-i18next';
 import { showToast } from '@org/data';
 
 const GET_DATA = gql`
@@ -62,6 +63,7 @@ interface Props {
 }
 
 export function PosMappingModal({ companyId, onClose }: Props) {
+  const { t } = useTranslation('modals');
   const { data, loading } = useQuery(GET_DATA, { variables: { companyId } });
   const [saveMappings] = useMutation(SAVE_MAPPINGS);
   const [mappings, setMappings] = useState<Map<string, Mapping>>(new Map());
@@ -108,10 +110,10 @@ export function PosMappingModal({ companyId, onClose }: Props) {
         inventoryId: m.inventoryItemId,
       }));
       await saveMappings({ variables: { companyId, mappings: mapsArray } });
-      showToast('✅ Mappings saved! Cost calculations are now accurate.', 'success', 5000);
+      showToast(t('posMapping.toast.saved', '✅ Mappings saved! Cost calculations are now accurate.'), 'success', 5000);
       onClose();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to save', 'error');
+      showToast(err instanceof Error ? err.message : t('posMapping.toast.saveFailed', 'Failed to save'), 'error');
     } finally { setSaving(false); }
   }
 
@@ -124,24 +126,30 @@ export function PosMappingModal({ companyId, onClose }: Props) {
         {/* Header */}
         <div style={{ padding: '22px 26px 14px', borderBottom: '1px solid #e5e7eb' }}>
           <h2 style={{ margin: '0 0 6px', fontSize: '1.15rem', fontWeight: 700, color: 'var(--vv-navy)' }}>
-            Match Your POS Menu to Your Recipe Cards
+            {t('posMapping.title', 'Match Your POS Menu to Your Recipe Cards')}
           </h2>
           <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-            Map each POS item to an inventory item once — venOS calculates costs automatically every sync. Use <em>"Not in my menu"</em> for tips, misc charges, etc.
+            <Trans t={t} i18nKey="posMapping.description" defaults='Map each POS item to an inventory item once — venOS calculates costs automatically every sync. Use <2>"Not in my menu"</2> for tips, misc charges, etc.'>
+              Map each POS item to an inventory item once — venOS calculates costs automatically every sync. Use <em>"Not in my menu"</em> for tips, misc charges, etc.
+            </Trans>
           </p>
         </div>
 
         {/* Auto-suggest legend */}
         {suggestedCount > 0 && (
           <div style={{ padding: '8px 26px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: '0.8rem', color: '#78350f' }}>
-            ✨ <strong>{suggestedCount} item(s)</strong> were auto-matched by name — marked <span style={{ background: '#fef3c7', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>suggested</span>. Review before saving.
+            <Trans t={t} i18nKey="posMapping.suggestedLegend" count={suggestedCount} values={{ count: suggestedCount }} defaults="✨ <1>{{count}} item(s)</1> were auto-matched by name — marked <3>suggested</3>. Review before saving.">
+              ✨ <strong>{{ count: suggestedCount }} item(s)</strong> were auto-matched by name — marked <span style={{ background: '#fef3c7', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>suggested</span>. Review before saving.
+            </Trans>
           </div>
         )}
 
         {/* Unmapped warning */}
         {unmappedCount > 0 && (
           <div style={{ padding: '8px 26px', background: '#fff7ed', borderBottom: '1px solid #fed7aa', fontSize: '0.8rem', color: '#c2410c' }}>
-            ⚠️ <strong>{unmappedCount} item(s)</strong> have no recipe card — COGS will show as $0 for those.
+            <Trans t={t} i18nKey="posMapping.unmappedWarning" count={unmappedCount} values={{ count: unmappedCount }} defaults="⚠️ <1>{{count}} item(s)</1> have no recipe card — COGS will show as $0 for those.">
+              ⚠️ <strong>{{ count: unmappedCount }} item(s)</strong> have no recipe card — COGS will show as $0 for those.
+            </Trans>
           </div>
         )}
 
@@ -152,15 +160,15 @@ export function PosMappingModal({ companyId, onClose }: Props) {
           </div>
         ) : catalogItems.length === 0 ? (
           <div style={{ padding: '24px 26px', color: 'var(--muted)', fontSize: '0.88rem' }}>
-            No POS catalog items found. Make sure your POS is connected and has items.
+            {t('posMapping.empty', 'No POS catalog items found. Make sure your POS is connected and has items.')}
           </div>
         ) : (
           <div style={{ overflowY: 'auto', maxHeight: 400 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb', width: '45%' }}>POS Item</th>
-                  <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb' }}>Your Inventory Item</th>
+                  <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb', width: '45%' }}>{t('posMapping.colPosItem', 'POS Item')}</th>
+                  <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #e5e7eb' }}>{t('posMapping.colInventoryItem', 'Your Inventory Item')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,13 +196,13 @@ export function PosMappingModal({ companyId, onClose }: Props) {
                               background: isSuggested ? '#fffbeb' : '#fff',
                             }}
                           >
-                            <option value="">— Not in my menu —</option>
+                            <option value="">{t('posMapping.notInMenu', '— Not in my menu —')}</option>
                             {inventoryItems.map(inv => (
-                              <option key={inv.id} value={inv.id}>{inv.name} (${Number(inv.unitCost).toFixed(4)}/unit)</option>
+                              <option key={inv.id} value={inv.id}>{t('posMapping.inventoryOption', '{{name}} (${{cost}}/unit)', { name: inv.name, cost: Number(inv.unitCost).toFixed(4) })}</option>
                             ))}
                           </select>
                           {isSuggested && (
-                            <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: 99, padding: '1px 7px', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>suggested</span>
+                            <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: 99, padding: '1px 7px', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{t('posMapping.suggestedBadge', 'suggested')}</span>
                           )}
                         </div>
                       </td>
@@ -208,9 +216,9 @@ export function PosMappingModal({ companyId, onClose }: Props) {
 
         {/* Footer */}
         <div style={{ padding: '14px 26px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#fff' }}>
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-secondary" onClick={onClose}>{t('posMapping.cancel', 'Cancel')}</button>
           <button className="btn-primary" onClick={handleSave} disabled={saving || loading}>
-            {saving && <span className="spinner" />} <span>Save Mappings</span>
+            {saving && <span className="spinner" />} <span>{t('posMapping.save', 'Save Mappings')}</span>
           </button>
         </div>
       </div>

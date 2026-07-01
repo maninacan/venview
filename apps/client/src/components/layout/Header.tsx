@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase, showToast, useAuth } from '@org/data';
 import { AlertsBell } from './AlertsBell';
 import venviewLogo from '../../assets/venview-icon-lg.png';
@@ -32,11 +33,12 @@ export function Header({ companyId, companyName }: Props) {
   const avatarRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation('nav');
 
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate('/auth');
-    showToast('Signed out.', 'info');
+    showToast(t('toast.signedOut', 'Signed out.'), 'info');
   }
 
   function closeMenu() { setMenuOpen(false); }
@@ -66,16 +68,16 @@ export function Header({ companyId, companyName }: Props) {
         className="flex items-center gap-2.5 no-underline flex-shrink-0"
         onClick={closeMenu}
       >
-        <img src={venviewLogo} alt="venOS" className="h-[50px] w-auto" />
+        <img src={venviewLogo} alt={t('logoAlt', 'venOS')} className="h-[50px] w-auto" />
         <div>
           <span
             className="block text-[1.05rem] leading-tight font-bold"
             style={{ color: '#2E7D32' }}
           >
-            venOS Events
+            {t('brand.name', 'venOS Events')}
           </span>
           <span className="block text-[0.68rem] text-[#666]">
-            {companyName ?? 'Vendor Intelligence for Events'}
+            {companyName ?? t('brand.tagline', 'Vendor Intelligence for Events')}
           </span>
         </div>
       </Link>
@@ -85,7 +87,7 @@ export function Header({ companyId, companyName }: Props) {
         <button
           className="flex flex-col justify-between w-[22px] h-4 bg-transparent border-0 cursor-pointer p-0 md:hidden"
           onClick={() => setMenuOpen(o => !o)}
-          aria-label="Menu"
+          aria-label={t('menu.toggle', 'Menu')}
         >
           <span className="block w-full h-0.5 bg-[#222] rounded-sm" />
           <span className="block w-full h-0.5 bg-[#222] rounded-sm" />
@@ -97,17 +99,17 @@ export function Header({ companyId, companyName }: Props) {
           className={`${menuOpen ? 'flex' : 'hidden'} fixed top-[70px] left-0 right-0 z-[99] flex-col bg-white p-2.5 gap-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.12)] border-t border-[#dde3f0] md:flex md:static md:flex-row md:bg-transparent md:p-0 md:gap-0.5 md:shadow-none md:z-auto md:border-0`}
         >
           {!inCompany && (
-            <NavLink to="/companies" end className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-building w-4 text-center" /> My Companies</NavLink>
+            <NavLink to="/companies" end className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-building w-4 text-center" /> {t('menu.myCompanies', 'My Companies')}</NavLink>
           )}
 
           {inCompany && (
             <>
-              <Link to="/companies" className={linkBase} onClick={closeMenu}><i className="fa-solid fa-arrow-left w-4 text-center" /> Companies</Link>
-              <NavLink to={`/companies/${companyId}`} end className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-house w-4 text-center" /> Home</NavLink>
-              <NavLink to={`/companies/${companyId}/events`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-calendar-days w-4 text-center" /> Events</NavLink>
-              <NavLink to={`/companies/${companyId}/recipes`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-utensils w-4 text-center" /> Recipes</NavLink>
-              <NavLink to={`/companies/${companyId}/inventory`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-boxes-stacked w-4 text-center" /> My Inventory</NavLink>
-              <NavLink to={`/companies/${companyId}/restock`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-arrows-rotate w-4 text-center" /> Restock</NavLink>
+              <Link to="/companies" className={linkBase} onClick={closeMenu}><i className="fa-solid fa-arrow-left w-4 text-center" /> {t('menu.companies', 'Companies')}</Link>
+              <NavLink to={`/companies/${companyId}`} end className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-house w-4 text-center" /> {t('menu.home', 'Home')}</NavLink>
+              <NavLink to={`/companies/${companyId}/events`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-calendar-days w-4 text-center" /> {t('menu.events', 'Events')}</NavLink>
+              <NavLink to={`/companies/${companyId}/recipes`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-utensils w-4 text-center" /> {t('menu.recipes', 'Recipes')}</NavLink>
+              <NavLink to={`/companies/${companyId}/inventory`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-boxes-stacked w-4 text-center" /> {t('menu.myInventory', 'My Inventory')}</NavLink>
+              <NavLink to={`/companies/${companyId}/restock`} className={({ isActive }) => `${linkBase}${isActive ? ` ${linkActive}` : ''}`} onClick={closeMenu}><i className="fa-solid fa-arrows-rotate w-4 text-center" /> {t('menu.restock', 'Restock')}</NavLink>
             </>
           )}
 
@@ -120,7 +122,7 @@ export function Header({ companyId, companyName }: Props) {
           <button
             className="w-9 h-9 rounded-full bg-[#0B2A4A] text-white text-[0.82rem] font-semibold flex items-center justify-center cursor-pointer border-0 hover:bg-[#0A3A67] transition-colors"
             onClick={() => setAvatarOpen(o => !o)}
-            aria-label="Account menu"
+            aria-label={t('account.menu', 'Account menu')}
             aria-haspopup="menu"
             aria-expanded={avatarOpen}
             title={email}
@@ -139,22 +141,22 @@ export function Header({ companyId, companyName }: Props) {
               </div>
 
               <NavLink to="/profile" className={({ isActive }) => `${menuItem}${isActive ? ` ${menuItemActive}` : ''}`} role="menuitem" onClick={closeAvatar}>
-                <i className="fa-solid fa-user w-4 text-center text-[#64748b]" /> Profile
+                <i className="fa-solid fa-user w-4 text-center text-[#64748b]" /> {t('account.profile', 'Profile')}
               </NavLink>
               {inCompany && (
                 <>
                   <NavLink to={`/companies/${companyId}/billing`} className={({ isActive }) => `${menuItem}${isActive ? ` ${menuItemActive}` : ''}`} role="menuitem" onClick={closeAvatar}>
-                    <i className="fa-solid fa-credit-card w-4 text-center text-[#64748b]" /> Billing
+                    <i className="fa-solid fa-credit-card w-4 text-center text-[#64748b]" /> {t('account.billing', 'Billing')}
                   </NavLink>
                   <NavLink to={`/companies/${companyId}/settings`} className={({ isActive }) => `${menuItem}${isActive ? ` ${menuItemActive}` : ''}`} role="menuitem" onClick={closeAvatar}>
-                    <i className="fa-solid fa-gear w-4 text-center text-[#64748b]" /> Settings
+                    <i className="fa-solid fa-gear w-4 text-center text-[#64748b]" /> {t('account.settings', 'Settings')}
                   </NavLink>
                 </>
               )}
 
               <div className="border-t border-[#eef1f6] my-1" />
               <button className={menuItem} role="menuitem" onClick={() => { closeAvatar(); handleLogout(); }}>
-                <i className="fa-solid fa-right-from-bracket w-4 text-center text-[#64748b]" /> Logout
+                <i className="fa-solid fa-right-from-bracket w-4 text-center text-[#64748b]" /> {t('account.logout', 'Logout')}
               </button>
             </div>
           )}

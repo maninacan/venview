@@ -1,0 +1,34 @@
+{
+  "welcomeBack": "Welcome back!",
+  "myCompanies": "My Companies",
+  "subtitle": "Select a company to manage its events, inventory, and recipes.",
+  "createNew": "Create a new company",
+  "requestToJoin": "Request to join a company",
+  "joinCodePlaceholder": "Enter join code (e.g. ABC123)",
+  "requestAccess": "Request access",
+  "cancel": "Cancel",
+  "create": {
+    "heading": "Register Your Company",
+    "subtitle": "Set up your food truck or vendor business on venOS.",
+    "companyName": "Company Name *",
+    "companyNamePlaceholder": "e.g. Lemon Drip Food Co.",
+    "vendorCategory": "Vendor Category",
+    "vendorCategoryPlaceholder": "e.g. Food Truck, Catering, Farmers Market",
+    "contactName": "Contact Name",
+    "contactNamePlaceholder": "Owner / contact name",
+    "phone": "Phone",
+    "countryCodeLabel": "Country code",
+    "phonePlaceholder": "(555) 555-5555",
+    "email": "Email",
+    "emailPlaceholder": "contact@yourcompany.com",
+    "submit": "Create Company",
+    "cancel": "Cancel"
+  },
+  "toast": {
+    "alreadyMember": "You're already a member of {{name}}.",
+    "accessRequested": "Access requested for {{name}} — pending owner approval.",
+    "invalidJoinCode": "Invalid join code",
+    "created": "Company \"{{name}}\" created!",
+    "createFailed": "Failed to create company"
+  }
+}

@@ -21,6 +21,8 @@ export const typeDefs = `#graphql
     ownerId: ID!
     joinCode: String
     plan: String!
+    "ISO 4217 currency code the merchant transacts in (defaults to 'USD'). Amounts are shown in this currency, POS-style."
+    currency: String!
     subscriptionStatus: String
     currentPeriodEnd: String
     createdAt: String
@@ -69,6 +71,8 @@ export const typeDefs = `#graphql
     contactName: String
     vendorCategory: String
     email: String
+    "ISO 4217 currency code (e.g. 'USD', 'MXN')."
+    currency: String
   }
 
   # ─── Events ──────────────────────────────────────────────────────────────────
@@ -431,6 +435,8 @@ export const typeDefs = `#graphql
   type PosLocation {
     id: String!
     name: String!
+    "ISO 4217 currency code reported by the POS for this location, if known."
+    currency: String
   }
 
   type PosCatalogItem {

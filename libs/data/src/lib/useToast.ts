@@ -14,7 +14,8 @@ export function showToast(
   message: string,
   type: ToastType = 'info',
   duration = 3500,
-  onRetry?: () => void
+  onRetry?: () => void,
+  retryLabel = 'Retry'
 ) {
   const container = getContainer();
   const toast = document.createElement('div');
@@ -27,7 +28,7 @@ export function showToast(
   if (onRetry) {
     const btn = document.createElement('button');
     btn.className = 'toast-retry';
-    btn.textContent = 'Retry';
+    btn.textContent = retryLabel;
     btn.addEventListener('click', () => { toast.remove(); onRetry(); });
     toast.appendChild(btn);
     duration = Math.max(duration, 6000);

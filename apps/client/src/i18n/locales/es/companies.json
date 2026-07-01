@@ -1,0 +1,34 @@
+{
+  "welcomeBack": "¡Bienvenido de nuevo!",
+  "myCompanies": "Mis empresas",
+  "subtitle": "Selecciona una empresa para administrar sus eventos, inventario y recetas.",
+  "createNew": "Crear una nueva empresa",
+  "requestToJoin": "Solicitar unirse a una empresa",
+  "joinCodePlaceholder": "Ingresa el código de acceso (p. ej. ABC123)",
+  "requestAccess": "Solicitar acceso",
+  "cancel": "Cancelar",
+  "create": {
+    "heading": "Registra tu empresa",
+    "subtitle": "Configura tu food truck o negocio de vendedor en venOS.",
+    "companyName": "Nombre de la empresa *",
+    "companyNamePlaceholder": "p. ej. Lemon Drip Food Co.",
+    "vendorCategory": "Categoría de vendedor",
+    "vendorCategoryPlaceholder": "p. ej. food truck, banquetes, mercado de agricultores",
+    "contactName": "Nombre de contacto",
+    "contactNamePlaceholder": "Nombre del propietario / contacto",
+    "phone": "Teléfono",
+    "countryCodeLabel": "Código de país",
+    "phonePlaceholder": "(555) 555-5555",
+    "email": "Correo electrónico",
+    "emailPlaceholder": "contacto@tuempresa.com",
+    "submit": "Crear empresa",
+    "cancel": "Cancelar"
+  },
+  "toast": {
+    "alreadyMember": "Ya eres miembro de {{name}}.",
+    "accessRequested": "Se solicitó acceso a {{name}}: pendiente de aprobación del propietario.",
+    "invalidJoinCode": "Código de acceso no válido",
+    "created": "¡Empresa \"{{name}}\" creada!",
+    "createFailed": "No se pudo crear la empresa"
+  }
+}

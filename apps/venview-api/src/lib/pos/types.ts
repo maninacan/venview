@@ -16,10 +16,11 @@ export interface PosTokens {
   externalId?: string | null;     // merchant / shop / restaurant id
   locationId?: string | null;
   locationName?: string | null;
+  currency?: string | null;       // ISO 4217 of the default location, if known
   expiresAt?: string | null;      // ISO; access-token expiry
 }
 
-export interface PosLocation { id: string; name: string; }
+export interface PosLocation { id: string; name: string; currency?: string | null }
 
 export interface PosCatalogItem {
   posItemId: string;

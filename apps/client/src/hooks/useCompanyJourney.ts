@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '@org/data';
 
 // Single round-trip across existing root fields — no backend changes needed.
 const GET_JOURNEY = gql`
@@ -35,6 +37,8 @@ function readSet(key: string): Set<string> {
 }
 
 export function useCompanyJourney(companyId: string | null) {
+  const { t } = useTranslation('onboarding');
+  const { user } = useAuth();
   const skipsKey = `venview_journey_skips_${companyId}`;
   const dismissKey = `venview_journey_dismissed_${companyId}`;
 
@@ -65,32 +69,37 @@ export function useCompanyJourney(companyId: string | null) {
   const laborMethod = (data?.company?.laborMethod ?? null) as string | null;
   const answered = !!posSystem && !!laborMethod;
   const POS_LABELS: Record<string, string> = { square: 'Square', shopify: 'Shopify', toast: 'Toast' };
-  const posName = posSystem && POS_LABELS[posSystem] ? POS_LABELS[posSystem] : 'your POS';
+  const posName = posSystem && POS_LABELS[posSystem] ? POS_LABELS[posSystem] : t('steps.pos.genericPos', 'your POS');
+  const languageChosen = !!user?.user_metadata?.['lang'];
 
   const base: Array<Omit<JourneyStep, 'skipped'>> = [
     {
-      key: 'company', label: 'Create your company', description: 'Your workspace for events, recipes, and inventory.',
-      ctaLabel: 'Done', to: `/companies/${companyId}/settings`, done: true, optional: false,
+      key: 'language', label: t('steps.language.label', 'Choose your language'), description: t('steps.language.description', 'Pick your display language and currency.'),
+      ctaLabel: t('steps.language.cta', 'Choose language'), to: `/companies/${companyId}/settings#language`, done: languageChosen, optional: false,
     },
     {
-      key: 'pos', label: `Connect ${posName}`, description: 'Auto-sync sales (and labor) from your POS.',
-      ctaLabel: `Connect ${posName}`, to: `/companies/${companyId}/settings?setup=1`, done: posConnected, optional: true,
+      key: 'company', label: t('steps.company.label', 'Create your company'), description: t('steps.company.description', 'Your workspace for events, recipes, and inventory.'),
+      ctaLabel: t('steps.company.cta', 'Done'), to: `/companies/${companyId}/settings`, done: true, optional: false,
     },
     {
-      key: 'recipes', label: 'Add your recipes', description: 'Define ingredient costs so venOS can calculate COGS.',
-      ctaLabel: 'Add recipes', to: `/companies/${companyId}/recipes?setup=1`, done: recipeCount > 0, optional: true,
+      key: 'pos', label: t('steps.pos.label', 'Connect {{pos}}', { pos: posName }), description: t('steps.pos.description', 'Auto-sync sales (and labor) from your POS.'),
+      ctaLabel: t('steps.pos.cta', 'Connect {{pos}}', { pos: posName }), to: `/companies/${companyId}/settings?setup=1`, done: posConnected, optional: true,
     },
     {
-      key: 'inventory', label: 'Add your inventory', description: 'Import your product catalog to track stock and costs.',
-      ctaLabel: 'Add inventory', to: `/companies/${companyId}/inventory?setup=1`, done: inventoryCount > 0, optional: true,
+      key: 'recipes', label: t('steps.recipes.label', 'Add your recipes'), description: t('steps.recipes.description', 'Define ingredient costs so venOS can calculate COGS.'),
+      ctaLabel: t('steps.recipes.cta', 'Add recipes'), to: `/companies/${companyId}/recipes?setup=1`, done: recipeCount > 0, optional: true,
     },
     {
-      key: 'team', label: 'Invite your team', description: 'Share events, inventory, and recipes with teammates.',
-      ctaLabel: 'Invite team', to: `/companies/${companyId}/settings?setup=1#team-access`, done: memberCount > 1, optional: true,
+      key: 'inventory', label: t('steps.inventory.label', 'Add your inventory'), description: t('steps.inventory.description', 'Import your product catalog to track stock and costs.'),
+      ctaLabel: t('steps.inventory.cta', 'Add inventory'), to: `/companies/${companyId}/inventory?setup=1`, done: inventoryCount > 0, optional: true,
     },
     {
-      key: 'first-event', label: 'Create your first event', description: 'Add a market, festival, or pop-up to start tracking profit.',
-      ctaLabel: 'Create event', to: `/companies/${companyId}/events/new?setup=1`, done: eventCount > 0, optional: false,
+      key: 'team', label: t('steps.team.label', 'Invite your team'), description: t('steps.team.description', 'Share events, inventory, and recipes with teammates.'),
+      ctaLabel: t('steps.team.cta', 'Invite team'), to: `/companies/${companyId}/settings?setup=1#team-access`, done: memberCount > 1, optional: true,
+    },
+    {
+      key: 'first-event', label: t('steps.firstEvent.label', 'Create your first event'), description: t('steps.firstEvent.description', 'Add a market, festival, or pop-up to start tracking profit.'),
+      ctaLabel: t('steps.firstEvent.cta', 'Create event'), to: `/companies/${companyId}/events/new?setup=1`, done: eventCount > 0, optional: false,
     },
   ];
 

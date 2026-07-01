@@ -74,4 +74,14 @@ export interface PaginationProps {
   onPageChange?: (page: number) => void;
   onItemsPerPageChange?: (itemsPerPage: number) => void;
   currentPage: number;
+  /** Localized pagination labels; English is used for any omitted key. */
+  labels?: {
+    showing?: string;
+    to?: string;
+    of?: string;
+    results?: string;
+    perPage?: string;
+    previous?: string;
+    next?: string;
+  };
 }

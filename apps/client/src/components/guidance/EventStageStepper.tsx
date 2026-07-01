@@ -1,8 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { PHASE_LABELS, type EventStage } from '../../lib/eventStage';
 
 const PHASES: Array<keyof typeof PHASE_LABELS> = ['plan', 'reconcile', 'finalize'];
 
-const DESCRIPTIONS: Record<string, string> = {
+const DESCRIPTION_DEFAULTS: Record<string, string> = {
   plan: 'Event details & venue',
   reconcile: 'Capture sales, labor & costs',
   finalize: 'Review profit & lock it in',
@@ -10,6 +11,7 @@ const DESCRIPTIONS: Record<string, string> = {
 
 // Horizontal Plan → Reconcile → Finalize progress stepper for an event.
 export function EventStageStepper({ stage }: { stage: EventStage }) {
+  const { t } = useTranslation('onboarding');
   const activeIndex = stage.stepIndex;
   const isDone = stage.phase === 'done';
 
@@ -32,7 +34,7 @@ export function EventStageStepper({ stage }: { stage: EventStage }) {
                 <span className={`text-[0.82rem] font-semibold ${active || complete ? 'text-[#0B2A4A]' : 'text-[#94a3b8]'}`}>
                   {PHASE_LABELS[phase]}
                 </span>
-                <span className="text-[0.7rem] text-[#94a3b8] leading-tight">{DESCRIPTIONS[phase]}</span>
+                <span className="text-[0.7rem] text-[#94a3b8] leading-tight">{t(`stepper.descriptions.${phase}`, DESCRIPTION_DEFAULTS[phase])}</span>
               </div>
               {i < PHASES.length - 1 && (
                 <span className={`h-0.5 flex-1 min-w-[12px] -mt-5 ${i < activeIndex || isDone ? 'bg-[#16a34a]' : 'bg-[#e2e8f0]'}`} />

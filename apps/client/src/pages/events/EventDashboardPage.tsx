@@ -2,7 +2,11 @@ import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
+import { useCurrency } from '../../i18n/useCurrency';
+import { formatDate } from '../../i18n/format';
 import { ProfitSummaryCard } from '../../components/dashboard/ProfitSummaryCard';
 import { EventStageStepper } from '../../components/guidance/EventStageStepper';
 import { NextStepBanner } from '../../components/guidance/NextStepBanner';
@@ -48,21 +52,22 @@ function providerHasLabor(provider?: string | null) {
   return provider ? POS_HAS_LABOR[provider] ?? false : false;
 }
 
-function fmt(v: number | null | undefined) { return `$${Number(v ?? 0).toFixed(2)}`; }
-function formatDate(d: string | null | undefined) {
-  if (!d) return '—';
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const SHORT_DATE: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+function shortDate(d: string | null | undefined) {
+  return d ? formatDate(d, SHORT_DATE) : '—';
 }
-function formatDateRange(start: string | null | undefined, numDays: number | null | undefined) {
+function formatDateRange(start: string | null | undefined, numDays: number | null | undefined, t: TFunction) {
   if (!start) return '';
-  const s = formatDate(start);
+  const s = shortDate(start);
   if (!numDays || numDays <= 1) return s;
   const end = new Date(start + 'T00:00:00');
   end.setDate(end.getDate() + numDays - 1);
-  return `${s} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  return t('dashboard.dateRange', '{{start}} – {{end}}', { start: s, end: formatDate(end, SHORT_DATE) });
 }
 
 export function EventDashboardPage() {
+  const { t } = useTranslation('events');
+  const { fmt } = useCurrency();
   const { eventId } = useParams<{ eventId: string }>();
   const { companyId, company } = useCurrentCompany();
   const navigate = useNavigate();
@@ -112,13 +117,13 @@ export function EventDashboardPage() {
   }, [event?.id, company?.posStatus?.connected, eventId]);
 
   async function handleDelete() {
-    if (!confirm(`Delete "${event?.eventName}"? This cannot be undone.`)) return;
+    if (!confirm(t('dashboard.deleteConfirm', 'Delete "{{name}}"? This cannot be undone.', { name: event?.eventName }))) return;
     try {
       await deleteEvent({ variables: { id: eventId } });
-      showToast('Event deleted', 'info');
+      showToast(t('toast.eventDeleted', 'Event deleted'), 'info');
       navigate(`/companies/${companyId}/events`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to delete', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.deleteFailed', 'Failed to delete'), 'error');
     }
   }
 
@@ -134,39 +139,39 @@ export function EventDashboardPage() {
     return (
       <div className="inline-error">
         <span>⚠️</span>
-        <span>Could not load event. {error?.message}</span>
-        <button className="inline-error-retry" onClick={() => refetch()}>Retry</button>
+        <span>{t('dashboard.loadError', 'Could not load event.')} {error?.message}</span>
+        <button className="inline-error-retry" onClick={() => refetch()}>{t('dashboard.retry', 'Retry')}</button>
       </div>
     );
   }
 
   // Meta chips
   const metaFields = [
-    { label: 'Type', value: event?.eventType },
-    { label: 'Host', value: event?.eventHost },
-    { label: 'Coordinator', value: event?.coordinator },
-    { label: 'Location', value: event?.eventLocation },
-    { label: 'Status', value: event?.status },
-    { label: 'Time', value: event?.time },
-    { label: 'Rating', value: event?.eventRating },
-    { label: 'Applied', value: event?.applicationDate ? formatDate(event.applicationDate) : null },
-    { label: 'Notes', value: event?.notes },
+    { label: t('dashboard.meta.type', 'Type'), value: event?.eventType },
+    { label: t('dashboard.meta.host', 'Host'), value: event?.eventHost },
+    { label: t('dashboard.meta.coordinator', 'Coordinator'), value: event?.coordinator },
+    { label: t('dashboard.meta.location', 'Location'), value: event?.eventLocation },
+    { label: t('dashboard.meta.status', 'Status'), value: event?.status },
+    { label: t('dashboard.meta.time', 'Time'), value: event?.time },
+    { label: t('dashboard.meta.rating', 'Rating'), value: event?.eventRating },
+    { label: t('dashboard.meta.applied', 'Applied'), value: event?.applicationDate ? shortDate(event.applicationDate) : null },
+    { label: t('dashboard.meta.notes', 'Notes'), value: event?.notes },
   ].filter(f => f.value);
 
   // Event-data tabs (Inventory Sales → Ingredient Costs)
   const tabs: Array<{ title: string; headerRight?: ReactNode; content: ReactNode }> = [
     {
-      title: 'Inventory Sales',
+      title: t('dashboard.tabs.inventorySales', 'Inventory Sales'),
       content: inventorySales.length === 0 ? (
-        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>No Inventory Sales recorded. Pull sales to populate.</p>
+        <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>{t('dashboard.noInventorySales', 'No Inventory Sales recorded. Pull sales to populate.')}</p>
       ) : (
         <div className="table-container">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
             <thead><tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-              <th style={{ padding: '6px 8px' }}>Item</th>
-              <th style={{ padding: '6px 8px' }}>Qty Sold</th>
-              <th style={{ padding: '6px 8px' }}>Unit Cost</th>
-              <th style={{ padding: '6px 8px' }}>Total COGS</th>
+              <th style={{ padding: '6px 8px' }}>{t('dashboard.invItem', 'Item')}</th>
+              <th style={{ padding: '6px 8px' }}>{t('dashboard.invQtySold', 'Qty Sold')}</th>
+              <th style={{ padding: '6px 8px' }}>{t('dashboard.invUnitCost', 'Unit Cost')}</th>
+              <th style={{ padding: '6px 8px' }}>{t('dashboard.invTotalCogs', 'Total COGS')}</th>
             </tr></thead>
             <tbody>
               {inventorySales.map((r: Record<string, unknown>, i: number) => (
@@ -183,43 +188,43 @@ export function EventDashboardPage() {
       ),
     },
     {
-      title: 'Truck Inventory',
-      content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Truck inventory tracking coming in Phase 5.</p>,
+      title: t('dashboard.tabs.truckInventory', 'Truck Inventory'),
+      content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>{t('dashboard.truckInventoryComing', 'Truck inventory tracking coming in Phase 5.')}</p>,
     },
     {
-      title: 'Manual Sales Entry',
+      title: t('dashboard.tabs.manualSalesEntry', 'Manual Sales Entry'),
       content: <ManualSalesForm eventId={eventId!} sales={sales} onSaved={refetch} />,
     },
     {
-      title: 'Discounts',
-      content: <AdjustmentForm eventId={eventId!} field="discounts" label="Discounts" currentValue={Number(sales.discounts ?? 0)} onSaved={refetch} />,
+      title: t('dashboard.tabs.discounts', 'Discounts'),
+      content: <AdjustmentForm eventId={eventId!} field="discounts" label={t('dashboard.discountsLabel', 'Discounts')} currentValue={Number(sales.discounts ?? 0)} onSaved={refetch} />,
     },
     {
-      title: 'Labor',
+      title: t('dashboard.tabs.labor', 'Labor'),
       headerRight: company?.posStatus?.connected && providerHasLabor(company?.posStatus?.provider)
         ? <SyncLaborButton eventId={eventId!} posLocationId={event?.posLocationId} onSynced={refetch} />
         : undefined,
       content: <LaborSection eventId={eventId!} companyId={companyId!} laborEntries={laborEntries} laborMethod={company?.laborMethod} onSaved={refetch} />,
     },
     {
-      title: 'Additional Fees',
+      title: t('dashboard.tabs.additionalFees', 'Additional Fees'),
       content: <AdditionalFeesSection eventId={eventId!} fees={[]} onSaved={refetch} />,
     },
     {
-      title: 'Expenses',
+      title: t('dashboard.tabs.expenses', 'Expenses'),
       content: <ExpensesForm eventId={eventId!} expenses={expenses} onSaved={refetch} />,
     },
     {
-      title: 'Tips',
-      content: <AdjustmentForm eventId={eventId!} field="tips" label="Tips (pass-through)" currentValue={Number(sales.tips ?? 0)} onSaved={refetch} />,
+      title: t('dashboard.tabs.tips', 'Tips'),
+      content: <AdjustmentForm eventId={eventId!} field="tips" label={t('dashboard.tipsLabel', 'Tips (pass-through)')} currentValue={Number(sales.tips ?? 0)} onSaved={refetch} />,
     },
     {
-      title: 'Sales Tax',
+      title: t('dashboard.tabs.salesTax', 'Sales Tax'),
       content: <TaxSection eventId={eventId!} hasPos={!!event?.posLocationId} taxes={taxes} onSaved={refetch} />,
     },
     {
-      title: 'Ingredient Costs (Recipe Matching)',
-      content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>Recipe matching coming in Phase 5. Connect recipes to auto-calculate COGS.</p>,
+      title: t('dashboard.tabs.ingredientCosts', 'Ingredient Costs (Recipe Matching)'),
+      content: <p style={{ color: 'var(--muted)', fontSize: '0.86rem', margin: 0 }}>{t('dashboard.recipeMatchingComing', 'Recipe matching coming in Phase 5. Connect recipes to auto-calculate COGS.')}</p>,
     },
   ];
   const active = tabs[Math.min(activeTab, tabs.length - 1)];
@@ -261,12 +266,12 @@ export function EventDashboardPage() {
       <div className="mb-4">
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <div className="text-[1.35rem] font-bold text-[#0B2A4A]">{event?.eventName}</div>
-          {event?.isFinalized && <span className="finalized-badge-large">FINALIZED</span>}
+          {event?.isFinalized && <span className="finalized-badge-large">{t('dashboard.finalizedBadge', 'FINALIZED')}</span>}
         </div>
-        <div className="text-[0.88rem] text-[#64748b] font-medium mb-1.5">{formatDateRange(event?.eventDate, event?.numDays)}</div>
+        <div className="text-[0.88rem] text-[#64748b] font-medium mb-1.5">{formatDateRange(event?.eventDate, event?.numDays, t)}</div>
         {event?.finalizedDate && (
           <div className="text-[0.78rem] text-[#64748b] mt-0.5">
-            Finalized on: {formatDate(event.finalizedDate)}
+            {t('dashboard.finalizedOn', 'Finalized on: {{date}}', { date: shortDate(event.finalizedDate) })}
           </div>
         )}
 
@@ -285,9 +290,9 @@ export function EventDashboardPage() {
         <div className="flex flex-col gap-[7px] mb-[18px] mt-3.5">
           <div className="flex flex-wrap gap-2 items-center">
             {salesSourceButtons}
-            <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary"><i className="fa-solid fa-pen-to-square" /> Edit Event</Link>
-            <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary"><i className="fa-solid fa-chart-bar" /> Post-Event Report</Link>
-            <button className="btn-danger-subtle" onClick={handleDelete}><i className="fa-solid fa-trash" /> Delete Event</button>
+            <Link to={`/companies/${companyId}/events/${eventId}/edit`} className="btn-secondary"><i className="fa-solid fa-pen-to-square" /> {t('dashboard.editEvent', 'Edit Event')}</Link>
+            <Link to={`/companies/${companyId}/events/${eventId}/report`} className="btn-secondary"><i className="fa-solid fa-chart-bar" /> {t('dashboard.postEventReport', 'Post-Event Report')}</Link>
+            <button className="btn-danger-subtle" onClick={handleDelete}><i className="fa-solid fa-trash" /> {t('dashboard.deleteEvent', 'Delete Event')}</button>
           </div>
         </div>
       </div>
@@ -298,32 +303,32 @@ export function EventDashboardPage() {
       {autoPulling && (
         <div className="bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] rounded-xl px-5 py-3 mb-4 text-[0.9rem] font-semibold flex items-center gap-2">
           <span className="spinner spinner-dark" style={{ width: 16, height: 16, borderWidth: 2 }} />
-          Pulling your sales &amp; labor from your POS…
+          {t('dashboard.pullingSalesLabor', 'Pulling your sales & labor from your POS…')}
         </div>
       )}
 
       {!autoPulling && (
         isUpcoming && !showData ? (
           <NextStepBanner
-            eyebrow="Upcoming"
-            title="This event hasn't happened yet"
-            description="Sales & labor will appear automatically after the event. You can fill in details now."
-            ctaLabel="Edit details"
+            eyebrow={t('dashboard.banner.upcomingEyebrow', 'Upcoming')}
+            title={t('dashboard.banner.upcomingTitle', "This event hasn't happened yet")}
+            description={t('dashboard.banner.upcomingDesc', 'Sales & labor will appear automatically after the event. You can fill in details now.')}
+            ctaLabel={t('dashboard.banner.editDetails', 'Edit details')}
             to={`/companies/${companyId}/events/${eventId}/edit`}
           />
         ) : stage.phase === 'done' ? (
           <NextStepBanner
-            eyebrow="Finalized"
-            title="This event is finalized"
-            description="View or download the full profit report."
-            ctaLabel="View report"
+            eyebrow={t('dashboard.banner.finalizedEyebrow', 'Finalized')}
+            title={t('dashboard.banner.finalizedTitle', 'This event is finalized')}
+            description={t('dashboard.banner.finalizedDesc', 'View or download the full profit report.')}
+            ctaLabel={t('dashboard.banner.viewReport', 'View report')}
             to={`/companies/${companyId}/events/${eventId}/report`}
           />
         ) : (
           <NextStepBanner
             eyebrow={PHASE_LABELS[stage.phase]}
             title={stage.nextStep.label}
-            description={stage.phase === 'finalize' ? 'Sales are in — review the numbers and lock the event.' : 'Capture this event’s sales, then add labor and expenses.'}
+            description={stage.phase === 'finalize' ? t('dashboard.banner.finalizeDesc', 'Sales are in — review the numbers and lock the event.') : t('dashboard.banner.captureDesc', 'Capture this event’s sales, then add labor and expenses.')}
             ctaLabel={stage.nextStep.label}
             onClick={goToNextStep}
           />
@@ -333,9 +338,9 @@ export function EventDashboardPage() {
       {!showData && (
         <div className="bg-white rounded-xl border border-[rgba(11,42,74,0.12)] shadow-[0_4px_12px_rgba(11,42,74,0.08)] px-5 py-8 mb-2.5 text-center">
           <div className="text-[2rem] mb-2">📅</div>
-          <h3 className="m-0 mb-1 text-[1.05rem] font-bold text-[#0B2A4A]">Planning mode</h3>
-          <p className="m-0 mb-4 text-[0.86rem] text-[#64748b]">Sales, labor, and profit show up after the event. Use this time to finalize the details.</p>
-          <button className="btn-secondary" onClick={() => setForceShowData(true)}>Enter data anyway</button>
+          <h3 className="m-0 mb-1 text-[1.05rem] font-bold text-[#0B2A4A]">{t('dashboard.planningMode', 'Planning mode')}</h3>
+          <p className="m-0 mb-4 text-[0.86rem] text-[#64748b]">{t('dashboard.planningModeDesc', 'Sales, labor, and profit show up after the event. Use this time to finalize the details.')}</p>
+          <button className="btn-secondary" onClick={() => setForceShowData(true)}>{t('dashboard.enterDataAnyway', 'Enter data anyway')}</button>
         </div>
       )}
 
@@ -390,10 +395,11 @@ function SyncSalesButton({ eventId, posLocationId, onSynced }: { eventId: string
   `;
   const [sync] = useMutation(SYNC);
   const [syncing, setSyncing] = useState(false);
+  const { t } = useTranslation('events');
 
   async function handleSync() {
     if (!posLocationId) {
-      showToast('No POS location linked to this event. Edit the event to add one.', 'warning', 5000);
+      showToast(t('toast.noPosLocation', 'No POS location linked to this event. Edit the event to add one.'), 'warning', 5000);
       return;
     }
     setSyncing(true);
@@ -403,7 +409,7 @@ function SyncSalesButton({ eventId, posLocationId, onSynced }: { eventId: string
       showToast(result.message, result.success ? 'success' : 'warning', 5000);
       if (result.success) onSynced();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Sync failed', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.syncFailed', 'Sync failed'), 'error');
     } finally {
       setSyncing(false);
     }
@@ -412,7 +418,7 @@ function SyncSalesButton({ eventId, posLocationId, onSynced }: { eventId: string
   return (
     <button className="btn-primary" onClick={handleSync} disabled={syncing}>
       {syncing && <span className="spinner" />}
-      <span><i className="fa-solid fa-arrows-rotate" /> Pull Sales</span>
+      <span><i className="fa-solid fa-arrows-rotate" /> {t('dashboard.pullSales', 'Pull Sales')}</span>
     </button>
   );
 }
@@ -425,10 +431,11 @@ function SyncLaborButton({ eventId, posLocationId, onSynced }: { eventId: string
   `;
   const [sync] = useMutation(SYNC);
   const [syncing, setSyncing] = useState(false);
+  const { t } = useTranslation('events');
 
   async function handleSync() {
     if (!posLocationId) {
-      showToast('No POS location linked to this event. Edit the event to add one.', 'warning', 5000);
+      showToast(t('toast.noPosLocation', 'No POS location linked to this event. Edit the event to add one.'), 'warning', 5000);
       return;
     }
     setSyncing(true);
@@ -438,7 +445,7 @@ function SyncLaborButton({ eventId, posLocationId, onSynced }: { eventId: string
       showToast(result.message, result.success ? 'success' : 'warning', 5000);
       if (result.success) onSynced();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Labor sync failed', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.laborSyncFailed', 'Labor sync failed'), 'error');
     } finally {
       setSyncing(false);
     }
@@ -447,7 +454,7 @@ function SyncLaborButton({ eventId, posLocationId, onSynced }: { eventId: string
   return (
     <button className="btn-secondary" onClick={handleSync} disabled={syncing} style={{ fontSize: '0.8rem', padding: '3px 10px' }}>
       {syncing && <span className="spinner" />}
-      <span>Pull Labor</span>
+      <span>{t('dashboard.pullLabor', 'Pull Labor')}</span>
     </button>
   );
 }
@@ -471,6 +478,8 @@ function TaxSection({ eventId, hasPos, taxes, onSaved }: {
   `;
   const [setRates] = useMutation(SET_RATES);
   const [refreshRates] = useMutation(REFRESH_RATES);
+  const { t } = useTranslation('events');
+  const { fmt } = useCurrency();
 
   const statePctInit = (Number(taxes?.['stateRate'] ?? 0) * 100).toString();
   const localPctInit = (Number(taxes?.['localRate'] ?? 0) * 100).toString();
@@ -480,8 +489,8 @@ function TaxSection({ eventId, hasPos, taxes, onSaved }: {
   const [refreshing, setRefreshing] = useState(false);
 
   const j = (taxes?.['jurisdiction'] as { state?: string; county?: string; city?: string } | null) ?? {};
-  const stateName = j.state || 'State';
-  const localName = j.city || j.county || 'Local';
+  const stateName = j.state || t('dashboard.tax.stateFallback', 'State');
+  const localName = j.city || j.county || t('dashboard.tax.localFallback', 'Local');
   const stateTax = Number(taxes?.['stateTax'] ?? 0);
   const localTax = Number(taxes?.['localTax'] ?? 0);
   const taxCollected = Number(taxes?.['taxCollected'] ?? 0);
@@ -490,9 +499,9 @@ function TaxSection({ eventId, hasPos, taxes, onSaved }: {
     setSaving(true);
     try {
       await setRates({ variables: { eventId, stateTaxRate: (parseFloat(statePct) || 0) / 100, localTaxRate: (parseFloat(localPct) || 0) / 100 } });
-      showToast('Tax rates saved', 'success');
+      showToast(t('toast.taxRatesSaved', 'Tax rates saved'), 'success');
       onSaved();
-    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to save rates', 'error'); }
+    } catch (e) { showToast(e instanceof Error ? e.message : t('toast.saveRatesFailed', 'Failed to save rates'), 'error'); }
     finally { setSaving(false); }
   }
 
@@ -500,9 +509,9 @@ function TaxSection({ eventId, hasPos, taxes, onSaved }: {
     setRefreshing(true);
     try {
       await refreshRates({ variables: { eventId } });
-      showToast('Rates refreshed from ZIP', 'success');
+      showToast(t('toast.ratesRefreshed', 'Rates refreshed from ZIP'), 'success');
       onSaved();
-    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to refresh', 'error'); }
+    } catch (e) { showToast(e instanceof Error ? e.message : t('toast.refreshFailed', 'Failed to refresh'), 'error'); }
     finally { setRefreshing(false); }
   }
 
@@ -511,30 +520,30 @@ function TaxSection({ eventId, hasPos, taxes, onSaved }: {
   return (
     <div>
       <p style={{ color: 'var(--muted)', fontSize: '0.82rem', margin: '0 0 12px' }}>
-        Sales tax is a pass-through you remit to the taxing authorities — it's tracked here for your records and never counted as profit.
-        {hasPos ? ' Amounts come from your actual POS sales.' : ' Amounts are estimated from the rates below.'}
+        {t('dashboard.tax.intro', "Sales tax is a pass-through you remit to the taxing authorities — it's tracked here for your records and never counted as profit.")}
+        {hasPos ? ' ' + t('dashboard.tax.fromPos', 'Amounts come from your actual POS sales.') : ' ' + t('dashboard.tax.estimated', 'Amounts are estimated from the rates below.')}
       </p>
 
       <div style={{ marginBottom: 14 }}>
-        <div style={rowStyle}><span>Remit to {stateName} — State ({(Number(taxes?.['stateRate'] ?? 0) * 100).toFixed(2)}%)</span><strong>{fmt(stateTax)}</strong></div>
-        <div style={rowStyle}><span>{localName} — Local ({(Number(taxes?.['localRate'] ?? 0) * 100).toFixed(2)}%)</span><strong>{fmt(localTax)}</strong></div>
-        <div style={{ ...rowStyle, borderBottom: 'none', fontWeight: 700, color: 'var(--vv-navy)' }}><span>Total tax collected</span><strong>{fmt(taxCollected)}</strong></div>
+        <div style={rowStyle}><span>{t('dashboard.tax.remitState', 'Remit to {{name}} — State ({{rate}}%)', { name: stateName, rate: (Number(taxes?.['stateRate'] ?? 0) * 100).toFixed(2) })}</span><strong>{fmt(stateTax)}</strong></div>
+        <div style={rowStyle}><span>{t('dashboard.tax.local', '{{name}} — Local ({{rate}}%)', { name: localName, rate: (Number(taxes?.['localRate'] ?? 0) * 100).toFixed(2) })}</span><strong>{fmt(localTax)}</strong></div>
+        <div style={{ ...rowStyle, borderBottom: 'none', fontWeight: 700, color: 'var(--vv-navy)' }}><span>{t('dashboard.tax.totalCollected', 'Total tax collected')}</span><strong>{fmt(taxCollected)}</strong></div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
         <div className="form-group" style={{ margin: 0 }}>
-          <label style={{ fontSize: '0.8rem' }}>State rate %</label>
+          <label style={{ fontSize: '0.8rem' }}>{t('dashboard.tax.stateRate', 'State rate %')}</label>
           <input type="number" step="0.001" value={statePct} onChange={e => setStatePct(e.target.value)} style={{ width: 100 }} />
         </div>
         <div className="form-group" style={{ margin: 0 }}>
-          <label style={{ fontSize: '0.8rem' }}>Local rate %</label>
+          <label style={{ fontSize: '0.8rem' }}>{t('dashboard.tax.localRate', 'Local rate %')}</label>
           <input type="number" step="0.001" value={localPct} onChange={e => setLocalPct(e.target.value)} style={{ width: 100 }} />
         </div>
         <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={save} disabled={saving}>
-          {saving && <span className="spinner" />} <span>Save rates</span>
+          {saving && <span className="spinner" />} <span>{t('dashboard.tax.saveRates', 'Save rates')}</span>
         </button>
         <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={refresh} disabled={refreshing}>
-          {refreshing && <span className="spinner" />} <span>Refresh from ZIP</span>
+          {refreshing && <span className="spinner" />} <span>{t('dashboard.tax.refreshFromZip', 'Refresh from ZIP')}</span>
         </button>
       </div>
     </div>
@@ -550,6 +559,7 @@ function ManualSalesForm({ eventId, sales, onSaved }: { eventId: string; sales: 
     }
   `;
   const [updateSales] = useMutation(UPDATE);
+  const { t } = useTranslation('events');
   const [vals, setVals] = useState({
     grossSales: String(sales.grossSales ?? '0'),
     refunds: String(sales.refunds ?? '0'),
@@ -558,13 +568,20 @@ function ManualSalesForm({ eventId, sales, onSaved }: { eventId: string; sales: 
   });
   const [saving, setSaving] = useState(false);
 
+  const fieldLabels: Record<string, string> = {
+    grossSales: t('dashboard.manualSales.grossSales', 'gross Sales'),
+    refunds: t('dashboard.manualSales.refunds', 'refunds'),
+    discounts: t('dashboard.manualSales.discounts', 'discounts'),
+    totalCollected: t('dashboard.manualSales.totalCollected', 'total Collected'),
+  };
+
   async function save() {
     setSaving(true);
     try {
       await updateSales({ variables: { eventId, input: { grossSales: +vals.grossSales, refunds: +vals.refunds, discounts: +vals.discounts, totalCollected: +vals.totalCollected } } });
-      showToast('Sales saved!', 'success');
+      showToast(t('toast.salesSaved', 'Sales saved!'), 'success');
       onSaved();
-    } catch (e) { showToast('Failed to save', 'error'); }
+    } catch (e) { showToast(t('toast.saveFailedGeneric', 'Failed to save'), 'error'); }
     finally { setSaving(false); }
   }
 
@@ -572,13 +589,13 @@ function ManualSalesForm({ eventId, sales, onSaved }: { eventId: string; sales: 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
       {(['grossSales', 'refunds', 'discounts', 'totalCollected'] as const).map(k => (
         <div key={k} className="form-group" style={{ margin: 0 }}>
-          <label style={{ textTransform: 'capitalize' }}>{k.replace(/([A-Z])/g, ' $1')}</label>
+          <label style={{ textTransform: 'capitalize' }}>{fieldLabels[k]}</label>
           <input type="number" step="0.01" value={vals[k]} onChange={e => setVals(v => ({ ...v, [k]: e.target.value }))} />
         </div>
       ))}
       <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
         <button className="btn-primary" onClick={save} disabled={saving} style={{ fontSize: '0.86rem' }}>
-          {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> Save Sales Data</span>
+          {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> {t('dashboard.saveSalesData', 'Save Sales Data')}</span>
         </button>
       </div>
     </div>
@@ -592,6 +609,7 @@ function AdjustmentForm({ eventId, field, label, currentValue, onSaved }: { even
     }
   `;
   const [update] = useMutation(UPDATE);
+  const { t } = useTranslation('events');
   const [val, setVal] = useState(String(currentValue));
   const [saving, setSaving] = useState(false);
 
@@ -599,9 +617,9 @@ function AdjustmentForm({ eventId, field, label, currentValue, onSaved }: { even
     setSaving(true);
     try {
       await update({ variables: { eventId, [field]: +val } });
-      showToast(`${label} saved!`, 'success');
+      showToast(t('toast.fieldSaved', '{{label}} saved!', { label }), 'success');
       onSaved();
-    } catch { showToast('Failed to save', 'error'); }
+    } catch { showToast(t('toast.saveFailedGeneric', 'Failed to save'), 'error'); }
     finally { setSaving(false); }
   }
 
@@ -612,7 +630,7 @@ function AdjustmentForm({ eventId, field, label, currentValue, onSaved }: { even
         <input type="number" step="0.01" value={val} onChange={e => setVal(e.target.value)} />
       </div>
       <button className="btn-primary" onClick={save} disabled={saving} style={{ fontSize: '0.86rem', marginBottom: 0 }}>
-        {saving && <span className="spinner" />} <span>Save</span>
+        {saving && <span className="spinner" />} <span>{t('dashboard.save', 'Save')}</span>
       </button>
     </div>
   );
@@ -636,15 +654,17 @@ function LaborSection({ eventId, companyId, laborEntries, laborMethod, onSaved }
   const [deleteLabor] = useMutation(DELETE_LABOR);
   const { data: empData } = useQuery(GET_EMPLOYEES, { variables: { companyId } });
   const employees = empData?.employees ?? [];
+  const { t } = useTranslation('events');
+  const { fmt } = useCurrency();
 
   const [form, setForm] = useState({ name: '', hours: '', wage: '', flatRate: '' });
   const [saving, setSaving] = useState(false);
 
   async function addShift() {
     if (flatMode) {
-      if (!form.name || !form.flatRate) { showToast('Fill in name and flat rate', 'error'); return; }
+      if (!form.name || !form.flatRate) { showToast(t('toast.fillNameFlatRate', 'Fill in name and flat rate'), 'error'); return; }
     } else if (!form.name || !form.hours || !form.wage) {
-      showToast('Fill in name, hours, and wage', 'error'); return;
+      showToast(t('toast.fillNameHoursWage', 'Fill in name, hours, and wage'), 'error'); return;
     }
     setSaving(true);
     try {
@@ -653,9 +673,9 @@ function LaborSection({ eventId, companyId, laborEntries, laborMethod, onSaved }
         : { name: form.name, hours: +form.hours, wage: +form.wage };
       await create({ variables: { eventId, input } });
       setForm({ name: '', hours: '', wage: '', flatRate: '' });
-      showToast('Shift added', 'success');
+      showToast(t('toast.shiftAdded', 'Shift added'), 'success');
       onSaved();
-    } catch { showToast('Failed to add shift', 'error'); }
+    } catch { showToast(t('toast.addShiftFailed', 'Failed to add shift'), 'error'); }
     finally { setSaving(false); }
   }
 
@@ -673,8 +693,14 @@ function LaborSection({ eventId, companyId, laborEntries, laborMethod, onSaved }
       {laborEntries.length > 0 && (
         <table className="w-full border-collapse text-[0.86rem] mt-2">
           <thead><tr>
-            {['Name', 'Hours', 'Wage', 'Total', ''].map(h => (
-              <th key={h} className="px-2 py-1.5 text-left text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.04em] border-b border-[#dde3f0]">{h}</th>
+            {[
+              t('dashboard.labor.name', 'Name'),
+              t('dashboard.labor.hours', 'Hours'),
+              t('dashboard.labor.wage', 'Wage'),
+              t('dashboard.labor.total', 'Total'),
+              '',
+            ].map((h, hi) => (
+              <th key={hi} className="px-2 py-1.5 text-left text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.04em] border-b border-[#dde3f0]">{h}</th>
             ))}
           </tr></thead>
           <tbody>
@@ -682,8 +708,8 @@ function LaborSection({ eventId, companyId, laborEntries, laborMethod, onSaved }
               <tr key={r['id'] as string}>
                 <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">{r['name'] as string}</td>
                 <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">{Number(r['hours']).toFixed(2)}</td>
-                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">${Number(r['wage']).toFixed(2)}/hr</td>
-                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle font-semibold">${Number(r['total']).toFixed(2)}</td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle">{t('dashboard.labor.wagePerHour', '{{amount}}/hr', { amount: fmt(r['wage'] as number) })}</td>
+                <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle font-semibold">{fmt(r['total'] as number)}</td>
                 <td className="px-2 py-[7px] border-b border-[#f8fafc] align-middle"><button onClick={() => removeShift(r['id'] as string)} className="bg-transparent border-0 text-[#dc2626] cursor-pointer text-[0.85rem]"><i className="fa-solid fa-xmark" /></button></td>
               </tr>
             ))}
@@ -694,36 +720,36 @@ function LaborSection({ eventId, companyId, laborEntries, laborMethod, onSaved }
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: laborEntries.length > 0 ? 12 : 0, alignItems: 'flex-end' }}>
         {employees.length > 0 && (
           <div className="form-group" style={{ margin: 0 }}>
-            <label>Quick pick</label>
+            <label>{t('dashboard.labor.quickPick', 'Quick pick')}</label>
             <select onChange={e => { const emp = employees.find((x: { id: string }) => x.id === e.target.value); if (emp) pickEmployee(emp); e.target.value = ''; }} style={{ width: 160 }}>
-              <option value="">Employee…</option>
+              <option value="">{t('dashboard.labor.employeePlaceholder', 'Employee…')}</option>
               {employees.map((emp: { id: string; name: string; defaultWage: number }) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
             </select>
           </div>
         )}
         <div className="form-group" style={{ margin: 0 }}>
-          <label>Name</label>
+          <label>{t('dashboard.labor.name', 'Name')}</label>
           <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={{ width: 140 }} />
         </div>
         {flatMode ? (
           <div className="form-group" style={{ margin: 0 }}>
-            <label>Flat rate / shift</label>
+            <label>{t('dashboard.labor.flatRateShift', 'Flat rate / shift')}</label>
             <input type="number" step="0.01" value={form.flatRate} onChange={e => setForm(f => ({ ...f, flatRate: e.target.value }))} style={{ width: 110 }} />
           </div>
         ) : (
           <>
             <div className="form-group" style={{ margin: 0 }}>
-              <label>Hours</label>
+              <label>{t('dashboard.labor.hours', 'Hours')}</label>
               <input type="number" step="0.25" value={form.hours} onChange={e => setForm(f => ({ ...f, hours: e.target.value }))} style={{ width: 80 }} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label>Wage/hr</label>
+              <label>{t('dashboard.labor.wagePerHrLabel', 'Wage/hr')}</label>
               <input type="number" step="0.01" value={form.wage} onChange={e => setForm(f => ({ ...f, wage: e.target.value }))} style={{ width: 90 }} />
             </div>
           </>
         )}
         <button className="btn-primary" onClick={addShift} disabled={saving} style={{ marginBottom: 0 }}>
-          {saving && <span className="spinner" />} <span>+ Add Shift</span>
+          {saving && <span className="spinner" />} <span>{t('dashboard.labor.addShift', '+ Add Shift')}</span>
         </button>
       </div>
     </div>
@@ -741,6 +767,8 @@ function AdditionalFeesSection({ eventId, fees, onSaved }: { eventId: string; fe
   `;
   const [create] = useMutation(CREATE);
   const [deleteFee] = useMutation(DELETE_FEE);
+  const { t } = useTranslation('events');
+  const { fmt } = useCurrency();
   const [form, setForm] = useState({ label: '', amount: '', isDiscount: false });
   const [saving, setSaving] = useState(false);
 
@@ -751,7 +779,7 @@ function AdditionalFeesSection({ eventId, fees, onSaved }: { eventId: string; fe
       await create({ variables: { eventId, input: { label: form.label, amount: +form.amount, isDiscount: form.isDiscount } } });
       setForm({ label: '', amount: '', isDiscount: false });
       onSaved();
-    } catch { showToast('Failed', 'error'); }
+    } catch { showToast(t('toast.failed', 'Failed'), 'error'); }
     finally { setSaving(false); }
   }
 
@@ -759,28 +787,28 @@ function AdditionalFeesSection({ eventId, fees, onSaved }: { eventId: string; fe
     <div>
       {fees.map(f => (
         <div key={f['id'] as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.86rem' }}>
-          <span>{f['label'] as string}{f['isDiscount'] ? ' (discount)' : ''}</span>
+          <span>{f['label'] as string}{f['isDiscount'] ? t('dashboard.fees.discountSuffix', ' (discount)') : ''}</span>
           <span style={{ display: 'flex', gap: 8 }}>
-            <span>{f['isDiscount'] ? '-' : ''}${Number(f['amount']).toFixed(2)}</span>
+            <span>{f['isDiscount'] ? '-' : ''}{fmt(Number(f['amount']))}</span>
             <button onClick={() => { deleteFee({ variables: { id: f['id'] } }); onSaved(); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><i className="fa-solid fa-xmark" /></button>
           </span>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'flex-end' }}>
         <div className="form-group" style={{ margin: 0 }}>
-          <label>Label</label>
+          <label>{t('dashboard.fees.label', 'Label')}</label>
           <input type="text" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} style={{ width: 160 }} />
         </div>
         <div className="form-group" style={{ margin: 0 }}>
-          <label>Amount</label>
+          <label>{t('dashboard.fees.amount', 'Amount')}</label>
           <input type="number" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} style={{ width: 100 }} />
         </div>
         <div className="form-group" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
           <input type="checkbox" checked={form.isDiscount} onChange={e => setForm(f => ({ ...f, isDiscount: e.target.checked }))} id="feeDiscount" />
-          <label htmlFor="feeDiscount" style={{ marginBottom: 0 }}>Discount</label>
+          <label htmlFor="feeDiscount" style={{ marginBottom: 0 }}>{t('dashboard.fees.discount', 'Discount')}</label>
         </div>
         <button className="btn-primary" onClick={addFee} disabled={saving} style={{ marginBottom: 0 }}>
-          {saving && <span className="spinner" />} <span>+ Add</span>
+          {saving && <span className="spinner" />} <span>{t('dashboard.fees.add', '+ Add')}</span>
         </button>
       </div>
     </div>
@@ -796,15 +824,16 @@ function ExpensesForm({ eventId, expenses, onSaved }: { eventId: string; expense
     }
   `;
   const [update] = useMutation(UPDATE);
+  const { t } = useTranslation('events');
   const fields = [
-    { key: 'healthDeptFee', label: 'Health Dept Fee' },
-    { key: 'eventFee', label: 'Event Fee' },
-    { key: 'mileage', label: 'Mileage (miles)' },
-    { key: 'mileageRate', label: 'Mileage Rate ($/mi)' },
-    { key: 'coordinatorFee', label: 'Coordinator Fee' },
-    { key: 'posFee', label: 'Manual POS Fee' },
-    { key: 'employeeBonus', label: 'Employee Bonus' },
-    { key: 'eventRunnerFees', label: 'Event Runner Fees' },
+    { key: 'healthDeptFee', label: t('dashboard.expenses.healthDeptFee', 'Health Dept Fee') },
+    { key: 'eventFee', label: t('dashboard.expenses.eventFee', 'Event Fee') },
+    { key: 'mileage', label: t('dashboard.expenses.mileage', 'Mileage (miles)') },
+    { key: 'mileageRate', label: t('dashboard.expenses.mileageRate', 'Mileage Rate ($/mi)') },
+    { key: 'coordinatorFee', label: t('dashboard.expenses.coordinatorFee', 'Coordinator Fee') },
+    { key: 'posFee', label: t('dashboard.expenses.posFee', 'Manual POS Fee') },
+    { key: 'employeeBonus', label: t('dashboard.expenses.employeeBonus', 'Employee Bonus') },
+    { key: 'eventRunnerFees', label: t('dashboard.expenses.eventRunnerFees', 'Event Runner Fees') },
   ];
   const [vals, setVals] = useState<Record<string, string>>(
     Object.fromEntries(fields.map(f => [f.key, String(expenses[f.key] ?? '0')]))
@@ -816,9 +845,9 @@ function ExpensesForm({ eventId, expenses, onSaved }: { eventId: string; expense
     try {
       const input = Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, +v]));
       await update({ variables: { eventId, input } });
-      showToast('Expenses saved!', 'success');
+      showToast(t('toast.expensesSaved', 'Expenses saved!'), 'success');
       onSaved();
-    } catch { showToast('Failed to save', 'error'); }
+    } catch { showToast(t('toast.saveFailedGeneric', 'Failed to save'), 'error'); }
     finally { setSaving(false); }
   }
 
@@ -833,7 +862,7 @@ function ExpensesForm({ eventId, expenses, onSaved }: { eventId: string; expense
         ))}
       </div>
       <button className="btn-primary" onClick={save} disabled={saving} style={{ marginTop: 12, fontSize: '0.86rem' }}>
-        {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> Save Expenses</span>
+        {saving && <span className="spinner" />} <span><i className="fa-solid fa-floppy-disk" /> {t('dashboard.expenses.save', 'Save Expenses')}</span>
       </button>
     </div>
   );

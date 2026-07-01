@@ -5,7 +5,7 @@ import { gql } from '@apollo/client/core';
 const GET_COMPANY = gql`
   query GetCompany($id: ID!) {
     company(id: $id) {
-      id name plan joinCode vendorCategory posSystem laborMethod
+      id name plan joinCode vendorCategory posSystem laborMethod currency
       posStatus { connected provider locationName }
     }
   }

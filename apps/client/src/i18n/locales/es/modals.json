@@ -1,0 +1,101 @@
+{
+  "welcome": {
+    "beta": "🧪 Beta",
+    "title": "¡Bienvenido a venOS!",
+    "intro": "Nos estás ayudando a crear la forma más sencilla para que los vendedores de eventos sepan si realmente ganaron dinero.",
+    "focusPrefix": "Esta versión beta se enfoca en una sola cosa:",
+    "focusHighlight": "Llevarte del evento → a tu ganancia real en minutos.",
+    "stepsHeading": "Comienza en 3 pasos",
+    "step1": {
+      "title": "Agrega un evento real",
+      "description": "Usa un evento pasado de los últimos 30 días.",
+      "example1": "Mercado de productores",
+      "example2": "Servicio de banquetes",
+      "example3": "Evento escolar",
+      "example4": "Festival",
+      "cta": "Crea tu primer evento"
+    },
+    "step2": {
+      "title": "Conecta y sincroniza ventas",
+      "description": "Si usas Square, conéctalo en Configuración. venOS extraerá tus datos reales de ventas e impuestos automáticamente.",
+      "descriptionAlt": "Si no, captura los totales manualmente.",
+      "cta": "Sincronizar ventas"
+    },
+    "step3": {
+      "title": "Agrega tus costos",
+      "description": "Captura la mano de obra, insumos, cuotas del evento e impuestos sobre alimentos. Luego abre tu Resumen de ganancias.",
+      "cta": "Ver resumen de ganancias"
+    },
+    "discover": {
+      "heading": "Lo que descubrirás",
+      "item1": "✅ Tu ganancia neta real (después de impuestos y cuotas)",
+      "item2": "✅ El impacto real del costo de mano de obra",
+      "item3": "✅ Si el evento valió la pena",
+      "item4": "✅ Dónde perdiste margen"
+    },
+    "disclaimer": "Esta es una versión beta. Por favor reporta errores. Los cálculos financieros se basan en los datos capturados o sincronizados. Si algo parece incorrecto, avísanos.",
+    "ctaPrimary": "🚀 ¡Vamos! Crear mi primer evento",
+    "ctaExplore": "Prefiero explorar por mi cuenta"
+  },
+  "upgrade": {
+    "badge": "venOS Pro",
+    "title": "Descubre el panorama completo.",
+    "subtitle": "Consulta la ganancia real de cada evento, sigue las tendencias con el tiempo y toma mejores decisiones, más rápido.",
+    "contexts": {
+      "report": "Los reportes posteriores al evento son una función Pro.",
+      "finalize": "Starter incluye 1 evento finalizado. Mejora tu plan para registrar más.",
+      "history": "Ver el historial de eventos finalizados requiere Pro.",
+      "pdf": "La exportación a PDF es una función Pro.",
+      "multiday": "Starter admite eventos de hasta 2 días. Mejora a Pro para festivales más largos."
+    },
+    "featuresHeading": "Todo lo que incluye Pro",
+    "features": {
+      "reports": {
+        "title": "Reportes posteriores al evento",
+        "description": "Desglose completo de pérdidas y ganancias, listo para compartir e imprimir"
+      },
+      "unlimited": {
+        "title": "Eventos finalizados ilimitados",
+        "description": "Registra cada mercado, festival y pop-up que realices"
+      },
+      "pdf": {
+        "title": "Exportación a PDF",
+        "description": "Descarga reportes con tu marca para tus registros o tu contador"
+      },
+      "history": {
+        "title": "Historial completo de eventos",
+        "description": "Compara eventos con el tiempo para encontrar tus mercados más rentables"
+      },
+      "sync": {
+        "title": "Sincronización con Square POS",
+        "description": "Extrae datos reales de ventas, incluidas comisiones, reembolsos y descuentos"
+      },
+      "templates": {
+        "title": "Plantillas de formulario personalizadas",
+        "description": "Diseña formularios de eventos que coincidan exactamente con tu forma de trabajar"
+      }
+    },
+    "starterNote": "Tienes <1>venOS Starter</1>: incluye 1 evento finalizado y un resumen de ganancias básico.",
+    "ctaUpgrade": "Mejorar a Pro",
+    "secureNote": "Pago seguro con tecnología de Stripe · cancela cuando quieras",
+    "ctaLater": "Quizás más tarde"
+  },
+  "posMapping": {
+    "title": "Vincula el menú de tu POS con tus fichas de receta",
+    "description": "Vincula cada artículo del POS con un artículo de inventario una sola vez: venOS calcula los costos automáticamente en cada sincronización. Usa <2>\"No está en mi menú\"</2> para propinas, cargos varios, etc.",
+    "suggestedLegend": "✨ <1>{{count}} artículo(s)</1> se vincularon automáticamente por nombre, marcados como <3>sugerido</3>. Revísalos antes de guardar.",
+    "unmappedWarning": "⚠️ <1>{{count}} artículo(s)</1> no tienen ficha de receta: el costo de ventas se mostrará como $0 para esos.",
+    "empty": "No se encontraron artículos en el catálogo del POS. Asegúrate de que tu POS esté conectado y tenga artículos.",
+    "colPosItem": "Artículo del POS",
+    "colInventoryItem": "Tu artículo de inventario",
+    "notInMenu": "— No está en mi menú —",
+    "inventoryOption": "{{name}} (${{cost}}/unidad)",
+    "suggestedBadge": "sugerido",
+    "cancel": "Cancelar",
+    "save": "Guardar vínculos",
+    "toast": {
+      "saved": "✅ ¡Vínculos guardados! Los cálculos de costos ahora son precisos.",
+      "saveFailed": "No se pudo guardar"
+    }
+  }
+}

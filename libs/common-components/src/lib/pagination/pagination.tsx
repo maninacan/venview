@@ -1,12 +1,34 @@
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+export interface PaginationLabels {
+  showing: string;
+  to: string;
+  of: string;
+  results: string;
+  perPage: string;
+  previous: string;
+  next: string;
+}
+
+const DEFAULT_LABELS: PaginationLabels = {
+  showing: 'Showing',
+  to: 'to',
+  of: 'of',
+  results: 'results',
+  perPage: '/ page',
+  previous: 'Previous',
+  next: 'Next',
+};
+
 interface PaginationProps {
   totalItems: number;
   itemsPerPage?: number;
   onPageChange?: (page: number) => void;
   onItemsPerPageChange?: (itemsPerPage: number) => void;
   currentPage: number;
+  /** Localized labels; English is used for any omitted key. */
+  labels?: Partial<PaginationLabels>;
 }
 
 const Pagination = ({
@@ -15,7 +37,9 @@ const Pagination = ({
   onPageChange,
   onItemsPerPageChange,
   currentPage,
+  labels,
 }: PaginationProps) => {
+  const l: PaginationLabels = { ...DEFAULT_LABELS, ...labels };
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   const handlePageChange = (page: number) => {
@@ -49,9 +73,9 @@ const Pagination = ({
       <div className="flex flex-1 items-center justify-between">
         <div className="flex items-center gap-2">
           <p className="text-xs text-gray-700">
-            Showing <span className="font-medium">{startItem}</span> to{' '}
-            <span className="font-medium">{endItem}</span> of{' '}
-            <span className="font-medium">{totalItems}</span> results
+            {l.showing} <span className="font-medium">{startItem}</span> {l.to}{' '}
+            <span className="font-medium">{endItem}</span> {l.of}{' '}
+            <span className="font-medium">{totalItems}</span> {l.results}
           </p>
           {onItemsPerPageChange && (
             <select
@@ -60,7 +84,7 @@ const Pagination = ({
               className="w-auto rounded-md border border-gray-300 bg-white py-1 pl-2 pr-7 text-xs text-gray-700 focus:outline-none"
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>{size} / page</option>
+                <option key={size} value={size}>{size} {l.perPage}</option>
               ))}
             </select>
           )}
@@ -72,7 +96,7 @@ const Pagination = ({
             disabled={currentPage === 1}
             className="relative inline-flex items-center rounded-l-md px-1.5 py-1.5 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"
           >
-            <span className="sr-only">Previous</span>
+            <span className="sr-only">{l.previous}</span>
             <i aria-hidden="true" className="fa-solid fa-chevron-left text-sm" />
           </button>
 
@@ -106,7 +130,7 @@ const Pagination = ({
             disabled={currentPage === totalPages}
             className="relative inline-flex items-center rounded-r-md px-1.5 py-1.5 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50"
           >
-            <span className="sr-only">Next</span>
+            <span className="sr-only">{l.next}</span>
             <i aria-hidden="true" className="fa-solid fa-chevron-right text-sm" />
           </button>
         </nav>

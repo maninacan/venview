@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
@@ -32,6 +33,7 @@ const COUNTRY_CODES = [
 ];
 
 export function CreateCompanyPage() {
+  const { t } = useTranslation('companies');
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', phone: '', contactName: '', vendorCategory: '', email: '' });
   const [countryCode, setCountryCode] = useState('+1');
@@ -54,10 +56,10 @@ export function CreateCompanyPage() {
       const { data } = await createCompany({
         variables: { input: { ...form, name: form.name.trim(), phone } },
       });
-      showToast(`Company "${data.createCompany.name}" created!`, 'success');
+      showToast(t('toast.created', 'Company "{{name}}" created!', { name: data.createCompany.name }), 'success');
       navigate(`/companies/${data.createCompany.id}`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to create company', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.createFailed', 'Failed to create company'), 'error');
     } finally {
       setLoading(false);
     }
@@ -67,49 +69,49 @@ export function CreateCompanyPage() {
     <>
       <div style={{ maxWidth: 560 }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--vv-navy)', marginBottom: 4 }}>
-          Register Your Company
+          {t('create.heading', 'Register Your Company')}
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: '0.88rem', marginBottom: 24 }}>
-          Set up your food truck or vendor business on venOS.
+          {t('create.subtitle', 'Set up your food truck or vendor business on venOS.')}
         </p>
 
         <div className="card">
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Company Name *</label>
+              <label>{t('create.companyName', 'Company Name *')}</label>
               <input
                 type="text"
                 autoComplete="organization"
-                placeholder="e.g. Lemon Drip Food Co."
+                placeholder={t('create.companyNamePlaceholder', 'e.g. Lemon Drip Food Co.')}
                 value={form.name}
                 onChange={e => update('name', e.target.value)}
                 required
               />
             </div>
             <div className="form-group">
-              <label>Vendor Category</label>
+              <label>{t('create.vendorCategory', 'Vendor Category')}</label>
               <input
                 type="text"
-                placeholder="e.g. Food Truck, Catering, Farmers Market"
+                placeholder={t('create.vendorCategoryPlaceholder', 'e.g. Food Truck, Catering, Farmers Market')}
                 value={form.vendorCategory}
                 onChange={e => update('vendorCategory', e.target.value)}
               />
             </div>
             <div className="form-group">
-              <label>Contact Name</label>
+              <label>{t('create.contactName', 'Contact Name')}</label>
               <input
                 type="text"
                 autoComplete="name"
-                placeholder="Owner / contact name"
+                placeholder={t('create.contactNamePlaceholder', 'Owner / contact name')}
                 value={form.contactName}
                 onChange={e => update('contactName', e.target.value)}
               />
             </div>
             <div className="form-group">
-              <label>Phone</label>
+              <label>{t('create.phone', 'Phone')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <select
-                  aria-label="Country code"
+                  aria-label={t('create.countryCodeLabel', 'Country code')}
                   value={countryCode}
                   onChange={e => setCountryCode(e.target.value)}
                   style={{ width: 150, flexShrink: 0 }}
@@ -123,7 +125,7 @@ export function CreateCompanyPage() {
                 <input
                   type="tel"
                   autoComplete="tel-national"
-                  placeholder="(555) 555-5555"
+                  placeholder={t('create.phonePlaceholder', '(555) 555-5555')}
                   value={form.phone}
                   onChange={e => update('phone', e.target.value)}
                   style={{ flex: 1 }}
@@ -131,11 +133,11 @@ export function CreateCompanyPage() {
               </div>
             </div>
             <div className="form-group">
-              <label>Email</label>
+              <label>{t('create.email', 'Email')}</label>
               <input
                 type="email"
                 autoComplete="email"
-                placeholder="contact@yourcompany.com"
+                placeholder={t('create.emailPlaceholder', 'contact@yourcompany.com')}
                 value={form.email}
                 onChange={e => update('email', e.target.value)}
               />
@@ -144,10 +146,10 @@ export function CreateCompanyPage() {
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button type="submit" className="btn-primary" disabled={loading}>
                 {loading && <span className="spinner" />}
-                <span>Create Company</span>
+                <span>{t('create.submit', 'Create Company')}</span>
               </button>
               <button type="button" className="btn-secondary" onClick={() => navigate('/companies')}>
-                Cancel
+                {t('create.cancel', 'Cancel')}
               </button>
             </div>
           </form>

@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { BackToSetupButton } from '../../components/guidance/BackToSetupButton';
 import { showToast } from '@org/data';
+import { useCurrency } from '../../i18n/useCurrency';
+import { formatNumber } from '../../i18n/format';
 
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
 
@@ -41,6 +44,12 @@ interface ImportedRecipe { tempId: string; name: string; ingredients: Ingredient
 const emptyIngredient = (): Ingredient => ({ name: '', quantity: 1, unitCost: 0, unit: '' });
 
 export function RecipesPage() {
+  const { t } = useTranslation('recipes');
+  const { currency } = useCurrency();
+  // Recipe/ingredient costs are shown to 4 decimals (sub-cent precision), which
+  // the 2-decimal currency formatter can't express — format with 4 fraction digits.
+  const fmtCost = (v: number) =>
+    formatNumber(v, { style: 'currency', currency, minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const { companyId } = useCurrentCompany();
   const { data, loading, refetch } = useQuery(GET_RECIPES, { variables: { companyId }, skip: !companyId });
   const [createRecipe] = useMutation(CREATE_RECIPE);
@@ -114,31 +123,31 @@ export function RecipesPage() {
   const totalCost = ingredients.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitCost) || 0), 0);
 
   async function handleSave() {
-    if (!name.trim()) { showToast('Recipe name required', 'error'); return; }
+    if (!name.trim()) { showToast(t('toast.nameRequired', 'Recipe name required'), 'error'); return; }
     setSaving(true);
     const input = { name: name.trim(), ingredients: ingredients.filter(i => i.name.trim()).map(({ id: _id, ...i }) => ({ ...i, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) };
     try {
       if (isNew) {
         await createRecipe({ variables: { companyId, input } });
-        showToast('Recipe created!', 'success');
+        showToast(t('toast.created', 'Recipe created!'), 'success');
       } else if (editing) {
         await updateRecipe({ variables: { id: editing.id, input } });
-        showToast('Recipe updated!', 'success');
+        showToast(t('toast.updated', 'Recipe updated!'), 'success');
       }
       refetch();
       closeForm();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to save', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.saveFailed', 'Failed to save'), 'error');
     } finally { setSaving(false); }
   }
 
   async function handleDelete(id: string, recipeName: string) {
-    if (!confirm(`Delete "${recipeName}"?`)) return;
+    if (!confirm(t('confirmDelete', 'Delete "{{name}}"?', { name: recipeName }))) return;
     try {
       await deleteRecipe({ variables: { id } });
-      showToast('Recipe deleted', 'info');
+      showToast(t('toast.deleted', 'Recipe deleted'), 'info');
       refetch();
-    } catch { showToast('Failed to delete', 'error'); }
+    } catch { showToast(t('toast.deleteFailed', 'Failed to delete'), 'error'); }
   }
 
   async function handleAIUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -164,7 +173,7 @@ export function RecipesPage() {
 
       if (!res.ok) {
         const error = await res.json() as { error: string };
-        throw new Error(error.error ?? 'Upload failed');
+        throw new Error(error.error ?? t('toast.uploadFailed', 'Upload failed'));
       }
 
       const reader = res.body!.getReader();
@@ -193,19 +202,19 @@ export function RecipesPage() {
       } catch (parseErr) {
         parseError = true;
         const reason = parseErr instanceof SyntaxError ? parseErr.message : String(parseErr);
-        setStreamingError(`JSON parse failed: ${reason}\n\nThe output above is what Claude returned. It may be truncated or contain unexpected text.`);
+        setStreamingError(t('toast.parseFailed', 'JSON parse failed: {{reason}}\n\nThe output above is what Claude returned. It may be truncated or contain unexpected text.', { reason }));
         return;
       }
 
       if (!parsed.recipes?.length) {
         parseError = true;
-        setStreamingError(`Claude could not find any recipes in this file.\n\nThe output above is what Claude returned. Check if your CSV has recognizable recipe names and ingredient rows.`);
+        setStreamingError(t('toast.noRecipesFound', 'Claude could not find any recipes in this file.\n\nThe output above is what Claude returned. Check if your CSV has recognizable recipe names and ingredient rows.'));
         return;
       }
       setImportedRecipes(parsed.recipes.map(r => ({ ...r, tempId: crypto.randomUUID() })));
       setShowImportModal(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Import failed', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.importFailed', 'Import failed'), 'error');
     } finally {
       setUploading(false);
       if (!parseError) setIsStreaming(false);
@@ -276,10 +285,10 @@ export function RecipesPage() {
 
       refetch();
       if (failed === 0) {
-        showToast(`Saved ${saved} recipe${saved !== 1 ? 's' : ''}!`, 'success', 5000);
+        showToast(t('toast.saved', 'Saved {{count}} recipes!', { count: saved }), 'success', 5000);
         closeImportModal();
       } else {
-        showToast(`Saved ${saved}, but ${failed} failed. Please retry the rest.`, 'warning', 6000);
+        showToast(t('toast.savedWithFailures', 'Saved {{saved}}, but {{failed}} failed. Please retry the rest.', { saved, failed }), 'warning', 6000);
       }
     } finally { setApprovingAll(false); }
   }
@@ -292,15 +301,15 @@ export function RecipesPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div>
-            <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>🍋 Recipes{!loading && recipes.length > 0 && <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({recipes.length})</span>}</h2>
+            <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}>{t('heading', '🍋 Recipes')}{!loading && recipes.length > 0 && <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({recipes.length})</span>}</h2>
             <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.86rem' }}>
-              Define ingredient costs for each dish. venOS uses these to calculate COGS automatically when you sync Square sales.
+              {t('subtitle', 'Define ingredient costs for each dish. venOS uses these to calculate COGS automatically when you sync Square sales.')}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="btn-secondary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
               <i className={uploading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'} />
-              {uploading ? ' Analyzing…' : ' AI Import'}
+              {uploading ? ` ${t('analyzing', 'Analyzing…')}` : ` ${t('aiImport', 'AI Import')}`}
             </button>
             <input
               type="file"
@@ -309,27 +318,27 @@ export function RecipesPage() {
               accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,.gif,.heic"
               onChange={handleAIUpload}
             />
-            <button className="btn-primary" onClick={openNew}>+ New Recipe</button>
+            <button className="btn-primary" onClick={openNew}>{t('newRecipe', '+ New Recipe')}</button>
             {recipes.length > 0 && (
               <button
                 className="btn-danger-subtle"
                 style={{ fontSize: '0.78rem', padding: '4px 10px' }}
                 onClick={async () => {
-                  if (!confirm(`[DEV] Delete all ${recipes.length} recipes?`)) return;
+                  if (!confirm(t('confirmDeleteAll', '[DEV] Delete all {{count}} recipes?', { count: recipes.length }))) return;
                   for (const r of recipes) await deleteRecipe({ variables: { id: r.id } }).catch(() => null);
                   refetch();
                 }}
               >
-                <i className="fa-solid fa-trash" /> Delete All
+                <i className="fa-solid fa-trash" /> {t('deleteAll', 'Delete All')}
               </button>
             )}
           </div>
         </div>
 
-        {loading && <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>Loading…</p>}
+        {loading && <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{t('loading', 'Loading…')}</p>}
         {!loading && recipes.length === 0 && (
           <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '32px 0', fontSize: '0.9rem' }}>
-            No recipes yet. <a href="#" onClick={e => { e.preventDefault(); openNew(); }} style={{ color: 'var(--vv-navy)', fontWeight: 600 }}>Create your first recipe →</a>
+            {t('emptyPrefix', 'No recipes yet. ')}<a href="#" onClick={e => { e.preventDefault(); openNew(); }} style={{ color: 'var(--vv-navy)', fontWeight: 600 }}>{t('createFirst', 'Create your first recipe →')}</a>
           </p>
         )}
 
@@ -337,28 +346,28 @@ export function RecipesPage() {
           {recipes.map(recipe => (
             <div key={recipe.id} className="bg-white border border-[rgba(11,42,74,0.12)] rounded-xl p-4 transition-shadow hover:shadow-[0_4px_12px_rgba(11,42,74,0.08)]">
               <div className="text-[0.97rem] font-bold text-[#0B2A4A] mb-1">{recipe.name}</div>
-              <div className="text-[0.82rem] text-[#64748b]">${Number(recipe.totalCost).toFixed(4)}/batch · {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? 's' : ''}</div>
+              <div className="text-[0.82rem] text-[#64748b]">{t('batchCost', '{{cost}}/batch', { cost: fmtCost(Number(recipe.totalCost)) })} · {t('ingredientCount', '{{count}} ingredients', { count: recipe.ingredients.length })}</div>
               <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => openEdit(recipe)}><i className="fa-solid fa-pen-to-square" /> Edit</button>
+                <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => openEdit(recipe)}><i className="fa-solid fa-pen-to-square" /> {t('edit', 'Edit')}</button>
                 <button className="btn-danger-subtle" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={() => handleDelete(recipe.id, recipe.name)}><i className="fa-solid fa-trash" /></button>
               </div>
               {recipe.ingredients.length > 0 && (
                 <details style={{ marginTop: 8 }}>
-                  <summary style={{ fontSize: '0.78rem', color: 'var(--muted)', cursor: 'pointer' }}>Ingredients ({recipe.ingredients.length})</summary>
+                  <summary style={{ fontSize: '0.78rem', color: 'var(--muted)', cursor: 'pointer' }}>{t('ingredientsSummary', 'Ingredients ({{count}})', { count: recipe.ingredients.length })}</summary>
                   <table style={{ width: '100%', fontSize: '0.8rem', marginTop: 6, borderCollapse: 'collapse' }}>
                     <thead><tr style={{ background: '#f8fafc' }}>
-                      <th style={{ textAlign: 'left', padding: '3px 6px' }}>Name</th>
-                      <th style={{ textAlign: 'right', padding: '3px 6px' }}>Qty</th>
-                      <th style={{ textAlign: 'right', padding: '3px 6px' }}>Unit Cost</th>
-                      <th style={{ textAlign: 'right', padding: '3px 6px' }}>Total</th>
+                      <th style={{ textAlign: 'left', padding: '3px 6px' }}>{t('table.name', 'Name')}</th>
+                      <th style={{ textAlign: 'right', padding: '3px 6px' }}>{t('table.qty', 'Qty')}</th>
+                      <th style={{ textAlign: 'right', padding: '3px 6px' }}>{t('table.unitCost', 'Unit Cost')}</th>
+                      <th style={{ textAlign: 'right', padding: '3px 6px' }}>{t('table.total', 'Total')}</th>
                     </tr></thead>
                     <tbody>
                       {recipe.ingredients.map((ing, i) => (
                         <tr key={i}>
                           <td style={{ padding: '3px 6px' }}>{ing.name}{ing.unit ? ` (${ing.unit})` : ''}</td>
                           <td style={{ padding: '3px 6px', textAlign: 'right' }}>{ing.quantity}</td>
-                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>${Number(ing.unitCost).toFixed(4)}</td>
-                          <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600 }}>${(Number(ing.quantity) * Number(ing.unitCost)).toFixed(4)}</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{fmtCost(Number(ing.unitCost))}</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600 }}>{fmtCost(Number(ing.quantity) * Number(ing.unitCost))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -375,47 +384,47 @@ export function RecipesPage() {
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeForm(); }}>
           <div className="modal-box" style={{ maxWidth: 600 }}>
             <button className="modal-close" onClick={closeForm}><i className="fa-solid fa-xmark" /></button>
-            <h3 style={{ margin: '0 0 16px' }}>{isNew ? 'New Recipe' : `Edit: ${editing?.name}`}</h3>
+            <h3 style={{ margin: '0 0 16px' }}>{isNew ? t('form.newTitle', 'New Recipe') : t('form.editTitle', 'Edit: {{name}}', { name: editing?.name })}</h3>
 
             <div className="form-group">
-              <label>Recipe Name *</label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Lemon Drop Cocktail" autoFocus />
+              <label>{t('form.recipeName', 'Recipe Name *')}</label>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('form.recipeNamePlaceholder', 'e.g. Lemon Drop Cocktail')} autoFocus />
             </div>
 
             <div style={{ margin: '16px 0 10px', fontWeight: 600, fontSize: '0.9rem', color: 'var(--vv-navy)' }}>
-              Ingredients
+              {t('form.ingredients', 'Ingredients')}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 70px 28px', gap: '6px 8px', fontSize: '0.84rem', marginBottom: 4 }}>
-              <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Name</span>
-              <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>Qty</span>
-              <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>Unit Cost</span>
-              <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Unit</span>
+              <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{t('form.name', 'Name')}</span>
+              <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>{t('form.qty', 'Qty')}</span>
+              <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>{t('form.unitCost', 'Unit Cost')}</span>
+              <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{t('form.unit', 'Unit')}</span>
               <span />
             </div>
 
             {ingredients.map((ing, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 70px 28px', gap: '4px 8px', marginBottom: 4 }}>
-                <input type="text" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} placeholder="Ingredient" />
+                <input type="text" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} placeholder={t('form.ingredientPlaceholder', 'Ingredient')} />
                 <input type="number" step="0.001" value={ing.quantity} onChange={e => updateIngredient(i, 'quantity', e.target.value)} style={{ textAlign: 'right' }} />
                 <input type="number" step="0.0001" value={ing.unitCost} onChange={e => updateIngredient(i, 'unitCost', e.target.value)} style={{ textAlign: 'right' }} />
-                <input type="text" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} placeholder="oz, g…" />
+                <input type="text" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} placeholder={t('form.unitPlaceholder', 'oz, g…')} />
                 <button onClick={() => removeIngredient(i)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem', padding: 0 }}><i className="fa-solid fa-xmark" /></button>
               </div>
             ))}
 
-            <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '5px 12px', marginTop: 6 }} onClick={addIngredient}>+ Add Ingredient</button>
+            <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '5px 12px', marginTop: 6 }} onClick={addIngredient}>{t('form.addIngredient', '+ Add Ingredient')}</button>
 
             <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 14px', margin: '14px 0', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--muted)' }}>Estimated batch cost</span>
-              <span style={{ fontWeight: 700, color: 'var(--vv-navy)' }}>${totalCost.toFixed(4)}</span>
+              <span style={{ color: 'var(--muted)' }}>{t('form.estimatedBatchCost', 'Estimated batch cost')}</span>
+              <span style={{ fontWeight: 700, color: 'var(--vv-navy)' }}>{fmtCost(totalCost)}</span>
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>
-                {saving && <span className="spinner" />} <span>Save Recipe</span>
+                {saving && <span className="spinner" />} <span>{t('form.saveRecipe', 'Save Recipe')}</span>
               </button>
-              <button className="btn-secondary" onClick={closeForm}>Cancel</button>
+              <button className="btn-secondary" onClick={closeForm}>{t('form.cancel', 'Cancel')}</button>
             </div>
           </div>
         </div>
@@ -428,10 +437,10 @@ export function RecipesPage() {
             <div style={{ padding: '24px 28px 12px', flexShrink: 0 }}>
               <h3 style={{ margin: '0 0 4px', color: streamingError ? 'var(--danger)' : 'var(--vv-navy)' }}>
                 <i className={`fa-solid ${streamingError ? 'fa-triangle-exclamation' : 'fa-spinner fa-spin'}`} style={{ marginRight: 8 }} />
-                {streamingError ? 'No Recipes Found — Raw Output' : 'Claude is analyzing your file…'}
+                {streamingError ? t('streaming.noRecipesTitle', 'No Recipes Found — Raw Output') : t('streaming.analyzingTitle', 'Claude is analyzing your file…')}
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>{streamingError ?? 'This may take a few minutes for large files.'}</span>
+                <span>{streamingError ?? t('streaming.largeFileNote', 'This may take a few minutes for large files.')}</span>
                 {!streamingError && (
                   <span style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontSize: '0.88rem', color: 'var(--vv-navy)', fontWeight: 600 }}>
                     {`${Math.floor(streamingElapsed / 60)}:${String(streamingElapsed % 60).padStart(2, '0')}`}
@@ -460,7 +469,7 @@ export function RecipesPage() {
             <div style={{ padding: '12px 28px 24px', flexShrink: 0 }}>
               {streamingError && (
                 <button className="btn-secondary" onClick={() => { setIsStreaming(false); setStreamingError(null); }}>
-                  Close
+                  {t('streaming.close', 'Close')}
                 </button>
               )}
             </div>
@@ -476,10 +485,10 @@ export function RecipesPage() {
             <div style={{ padding: '28px 28px 12px', flexShrink: 0 }}>
               <h3 style={{ margin: '0 0 4px' }}>
                 <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--vv-navy)', marginRight: 8 }} />
-                Review AI-Parsed Recipes
+                {t('review.title', 'Review AI-Parsed Recipes')}
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
-                {importedRecipes.length} recipe{importedRecipes.length !== 1 ? 's' : ''} detected. Edit or delete any before saving.
+                {t('review.detected', '{{count}} recipes detected. Edit or delete any before saving.', { count: importedRecipes.length })}
               </p>
             </div>
 
@@ -490,36 +499,36 @@ export function RecipesPage() {
                     /* Edit mode */
                     <>
                       <div className="form-group" style={{ marginBottom: 10 }}>
-                        <label style={{ fontSize: '0.82rem' }}>Recipe Name</label>
+                        <label style={{ fontSize: '0.82rem' }}>{t('review.recipeName', 'Recipe Name')}</label>
                         <input type="text" value={importEditName} onChange={e => setImportEditName(e.target.value)} autoFocus />
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 70px 28px', gap: '4px 8px', fontSize: '0.82rem', marginBottom: 4 }}>
-                        <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Name</span>
-                        <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>Qty</span>
-                        <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>Unit Cost</span>
-                        <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Unit</span>
+                        <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{t('review.name', 'Name')}</span>
+                        <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>{t('review.qty', 'Qty')}</span>
+                        <span style={{ color: 'var(--muted)', fontWeight: 600, textAlign: 'right' }}>{t('review.unitCost', 'Unit Cost')}</span>
+                        <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{t('review.unit', 'Unit')}</span>
                         <span />
                       </div>
                       {importEditIngredients.map((ing, i) => (
                         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 70px 28px', gap: '3px 8px', marginBottom: 3 }}>
-                          <input type="text" value={ing.name} onChange={e => updateImportIngredient(i, 'name', e.target.value)} placeholder="Ingredient" style={{ fontSize: '0.83rem' }} />
+                          <input type="text" value={ing.name} onChange={e => updateImportIngredient(i, 'name', e.target.value)} placeholder={t('review.ingredientPlaceholder', 'Ingredient')} style={{ fontSize: '0.83rem' }} />
                           <input type="number" step="0.001" value={ing.quantity} onChange={e => updateImportIngredient(i, 'quantity', e.target.value)} style={{ textAlign: 'right', fontSize: '0.83rem' }} />
                           <input type="number" step="0.0001" value={ing.unitCost} onChange={e => updateImportIngredient(i, 'unitCost', e.target.value)} style={{ textAlign: 'right', fontSize: '0.83rem' }} />
-                          <input type="text" value={ing.unit} onChange={e => updateImportIngredient(i, 'unit', e.target.value)} placeholder="oz…" style={{ fontSize: '0.83rem' }} />
+                          <input type="text" value={ing.unit} onChange={e => updateImportIngredient(i, 'unit', e.target.value)} placeholder={t('review.unitPlaceholder', 'oz…')} style={{ fontSize: '0.83rem' }} />
                           <button onClick={() => setImportEditIngredients(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}><i className="fa-solid fa-xmark" /></button>
                         </div>
                       ))}
-                      <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 10px', marginTop: 4 }} onClick={() => setImportEditIngredients(prev => [...prev, emptyIngredient()])}>+ Add Ingredient</button>
+                      <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 10px', marginTop: 4 }} onClick={() => setImportEditIngredients(prev => [...prev, emptyIngredient()])}>{t('review.addIngredient', '+ Add Ingredient')}</button>
 
                       <div style={{ background: '#f8fafc', borderRadius: 6, padding: '7px 10px', margin: '10px 0 8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                        <span style={{ color: 'var(--muted)' }}>Batch cost</span>
-                        <span style={{ fontWeight: 700, color: 'var(--vv-navy)' }}>${importEditCost.toFixed(4)}</span>
+                        <span style={{ color: 'var(--muted)' }}>{t('review.batchCost', 'Batch cost')}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--vv-navy)' }}>{fmtCost(importEditCost)}</span>
                       </div>
 
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={saveImportEdit}>Save Changes</button>
-                        <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => setImportEditing(null)}>Cancel</button>
+                        <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={saveImportEdit}>{t('review.saveChanges', 'Save Changes')}</button>
+                        <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => setImportEditing(null)}>{t('review.cancel', 'Cancel')}</button>
                       </div>
                     </>
                   ) : (
@@ -528,15 +537,15 @@ export function RecipesPage() {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--vv-navy)', marginBottom: 2 }}>{recipe.name}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                          {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? 's' : ''}
+                          {t('ingredientCount', '{{count}} ingredients', { count: recipe.ingredients.length })}
                           {recipe.ingredients.length > 0 && (
-                            <> · ${recipe.ingredients.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitCost) || 0), 0).toFixed(4)}/batch</>
+                            <> · {t('batchCost', '{{cost}}/batch', { cost: fmtCost(recipe.ingredients.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitCost) || 0), 0)) })}</>
                           )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 10px' }} onClick={() => startImportEdit(recipe)}>
-                          <i className="fa-solid fa-pen-to-square" /> Edit
+                          <i className="fa-solid fa-pen-to-square" /> {t('review.edit', 'Edit')}
                         </button>
                         <button className="btn-danger-subtle" style={{ fontSize: '0.78rem', padding: '3px 10px' }} onClick={() => deleteImportedRecipe(recipe.tempId)}>
                           <i className="fa-solid fa-trash" />
@@ -551,10 +560,10 @@ export function RecipesPage() {
             <div style={{ display: 'flex', gap: 10, padding: '14px 28px 28px', borderTop: '1px solid rgba(11,42,74,0.08)', flexShrink: 0 }}>
               <button className="btn-primary" onClick={handleApproveAll} disabled={approvingAll || importedRecipes.length === 0}>
                 {approvingAll && <span className="spinner" />}
-                <span><i className="fa-solid fa-check" /> Approve All ({importedRecipes.length})</span>
+                <span><i className="fa-solid fa-check" /> {t('review.approveAll', 'Approve All ({{count}})', { count: importedRecipes.length })}</span>
               </button>
               <button className="btn-danger-subtle" onClick={closeImportModal} disabled={approvingAll}>
-                <i className="fa-solid fa-trash" /> Discard Batch
+                <i className="fa-solid fa-trash" /> {t('review.discardBatch', 'Discard Batch')}
               </button>
             </div>
           </div>

@@ -120,6 +120,13 @@ async function handleCallback(req: Request, res: Response, providerOverride?: st
     }, { onConflict: 'companyId,provider' });
     if (upsertErr) logger.error('pos.oauth.callback: save failed', { companyId, provider, error: upsertErr.message });
 
+    // Adopt the merchant's POS currency so amounts display like the POS does.
+    if (tokens.currency) {
+      const { error: curErr } = await supabase
+        .from('Companies').update({ currency: tokens.currency }).eq('id', companyId);
+      if (curErr) logger.error('pos.oauth.callback: currency update failed', { companyId, error: curErr.message });
+    }
+
     res.redirect(`${clientUrl}/companies/${companyId}/settings?pos=connected`);
   } catch (err) {
     logger.error('pos.oauth.callback: exchange failed', { companyId, provider, error: err });

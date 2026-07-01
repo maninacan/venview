@@ -3,7 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
+import { useCurrency } from '../../i18n/useCurrency';
+import { formatDate } from '../../i18n/format';
 import { showToast } from '@org/data';
 
 const GET_EVENTS = gql`
@@ -30,16 +33,11 @@ const GET_TREND = gql`
 
 type FilterType = 'all' | 'finalized' | 'notfinalized';
 
-function fmt(v: number | null | undefined) {
-  return `$${Number(v ?? 0).toFixed(2)}`;
-}
-
-function formatDate(d: string | null | undefined) {
-  if (!d) return '—';
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 export function EventsPage() {
+  const { t } = useTranslation('events');
+  const { fmt } = useCurrency();
+  const eventDate = (d: string | null | undefined) =>
+    d ? formatDate(d, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
   const { companyId } = useCurrentCompany();
   const navigate = useNavigate();
 
@@ -58,10 +56,10 @@ export function EventsPage() {
 
   const events = eventsData?.events ?? [];
   const kpi = kpiData?.eventKpi;
-  const trend = (trendData?.eventTrend ?? []).map((t: { date: string; netProfit: number; name: string; eventId: string }) => ({
-    ...t,
-    date: formatDate(t.date),
-    profit: Number(t.netProfit.toFixed(2)),
+  const trend = (trendData?.eventTrend ?? []).map((tr: { date: string; netProfit: number; name: string; eventId: string }) => ({
+    ...tr,
+    date: eventDate(tr.date),
+    profit: Number(tr.netProfit.toFixed(2)),
   }));
 
   function handleSearch() {
@@ -75,14 +73,21 @@ export function EventsPage() {
 
   function exportCSV() {
     const rows = [
-      ['Event Name', 'Date', 'Status', 'Gross Sales', 'Net Profit', 'Finalized'],
+      [
+        t('csv.eventName', 'Event Name'),
+        t('csv.date', 'Date'),
+        t('csv.status', 'Status'),
+        t('csv.grossSales', 'Gross Sales'),
+        t('csv.netProfit', 'Net Profit'),
+        t('csv.finalized', 'Finalized'),
+      ],
       ...events.map((e: Record<string, unknown>) => [
         e['eventName'],
-        formatDate(e['eventDate'] as string),
+        eventDate(e['eventDate'] as string),
         e['status'] ?? '',
         fmt((e as { sales?: { grossSales?: number } })['sales']?.grossSales),
         fmt(e['netProfit'] as number),
-        e['isFinalized'] ? 'Yes' : 'No',
+        e['isFinalized'] ? t('csv.yes', 'Yes') : t('csv.no', 'No'),
       ]),
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
@@ -91,7 +96,7 @@ export function EventsPage() {
     const a = document.createElement('a');
     a.href = url; a.download = 'events.csv'; a.click();
     URL.revokeObjectURL(url);
-    showToast('CSV exported', 'success');
+    showToast(t('toast.csvExported', 'CSV exported'), 'success');
   }
 
   if (!companyId) return null;
@@ -99,16 +104,16 @@ export function EventsPage() {
   return (
     <>
       <div className="card">
-        <h2 style={{ margin: '0 0 16px', color: 'var(--vv-navy)' }}>Manage Events</h2>
+        <h2 style={{ margin: '0 0 16px', color: 'var(--vv-navy)' }}>{t('list.title', 'Manage Events')}</h2>
 
         {/* KPI chips */}
         {kpi && (
           <div className="flex gap-3.5 flex-wrap mb-5">
             {([
-              { label: 'Total Events', value: kpi.totalEvents },
-              { label: 'Finalized', value: kpi.finalizedCount },
-              { label: 'Gross Sales', value: fmt(kpi.grossSales) },
-              { label: 'Net Sales', value: fmt(kpi.netSales) },
+              { label: t('list.kpi.totalEvents', 'Total Events'), value: kpi.totalEvents },
+              { label: t('list.kpi.finalized', 'Finalized'), value: kpi.finalizedCount },
+              { label: t('list.kpi.grossSales', 'Gross Sales'), value: fmt(kpi.grossSales) },
+              { label: t('list.kpi.netSales', 'Net Sales'), value: fmt(kpi.netSales) },
             ] as { label: string; value: string | number }[]).map(chip => (
               <div key={chip.label} className="bg-white border border-[rgba(11,42,74,0.12)] rounded-[10px] px-[18px] py-3 flex-1 min-w-[130px]">
                 <span className="text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.05em] block mb-[3px]">{chip.label}</span>
@@ -122,8 +127,8 @@ export function EventsPage() {
         {trend.length > 1 && (
           <div style={{ background: '#f9fafb', borderRadius: 10, border: '1px solid #e5e7eb', padding: '14px 16px', marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontWeight: 600, color: '#374151', fontSize: '0.9rem' }}>Net Profit per Event</span>
-              <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>All events · sorted by date</span>
+              <span style={{ fontWeight: 600, color: '#374151', fontSize: '0.9rem' }}>{t('list.chart.title', 'Net Profit per Event')}</span>
+              <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{t('list.chart.subtitle', 'All events · sorted by date')}</span>
             </div>
             <ResponsiveContainer width="100%" height={100}>
               <AreaChart data={trend}>
@@ -135,8 +140,8 @@ export function EventsPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
-                <Tooltip formatter={(v: number) => [`$${Number(v).toFixed(2)}`, 'Net Profit']} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => fmt(v)} />
+                <Tooltip formatter={(v: number) => [fmt(v), t('list.chart.tooltipLabel', 'Net Profit')]} />
                 <Area type="monotone" dataKey="profit" stroke="#19B37A" strokeWidth={2} fill="url(#profitGrad)" dot={{ r: 3, fill: '#19B37A' }} />
               </AreaChart>
             </ResponsiveContainer>
@@ -152,7 +157,7 @@ export function EventsPage() {
               onClick={() => setFilter(f)}
               style={{ fontSize: '0.83rem', padding: '6px 13px' }}
             >
-              {f === 'all' ? 'All' : f === 'finalized' ? 'Finalized' : 'Not Finalized'}
+              {f === 'all' ? t('list.filter.all', 'All') : f === 'finalized' ? t('list.filter.finalized', 'Finalized') : t('list.filter.notFinalized', 'Not Finalized')}
             </button>
           ))}
         </div>
@@ -160,33 +165,40 @@ export function EventsPage() {
         <div className="flex gap-2 flex-wrap mb-4 items-end">
           <input
             type="text"
-            placeholder="Event name"
+            placeholder={t('list.searchPlaceholder', 'Event name')}
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             style={{ maxWidth: 220 }}
           />
-          <button className="btn-secondary" onClick={handleSearch}><i className="fa-solid fa-magnifying-glass" /> Search</button>
-          <button className="btn-secondary" onClick={clearSearch}><i className="fa-solid fa-broom" /> Clear</button>
-          <button className="btn-secondary" onClick={exportCSV}><i className="fa-solid fa-file-arrow-down" /> Export CSV</button>
+          <button className="btn-secondary" onClick={handleSearch}><i className="fa-solid fa-magnifying-glass" /> {t('list.search', 'Search')}</button>
+          <button className="btn-secondary" onClick={clearSearch}><i className="fa-solid fa-broom" /> {t('list.clear', 'Clear')}</button>
+          <button className="btn-secondary" onClick={exportCSV}><i className="fa-solid fa-file-arrow-down" /> {t('list.exportCsv', 'Export CSV')}</button>
           <Link to={`/companies/${companyId}/events/new`} className="btn-primary ml-auto">
-            + Add Event
+            {t('list.addEvent', '+ Add Event')}
           </Link>
         </div>
 
         {/* Events table */}
         <div className="overflow-x-auto">
           {eventsLoading ? (
-            <p className="text-[#64748b] text-[0.88rem] py-4">Loading events…</p>
+            <p className="text-[#64748b] text-[0.88rem] py-4">{t('list.loading', 'Loading events…')}</p>
           ) : events.length === 0 ? (
             <p className="text-[#64748b] text-[0.88rem] py-4 text-center">
-              No events found. <Link to={`/companies/${companyId}/events/new`} className="text-[#0B2A4A] font-semibold">Add your first event →</Link>
+              {t('list.empty', 'No events found.')} <Link to={`/companies/${companyId}/events/new`} className="text-[#0B2A4A] font-semibold">{t('list.emptyCta', 'Add your first event →')}</Link>
             </p>
           ) : (
             <table className="w-full border-collapse text-[0.87rem]">
               <thead>
                 <tr>
-                  {['Event Name', 'Date', 'Status', 'Gross Sales', 'Net Profit', 'Finalized'].map(h => (
+                  {[
+                    t('list.table.eventName', 'Event Name'),
+                    t('list.table.date', 'Date'),
+                    t('list.table.status', 'Status'),
+                    t('list.table.grossSales', 'Gross Sales'),
+                    t('list.table.netProfit', 'Net Profit'),
+                    t('list.table.finalized', 'Finalized'),
+                  ].map(h => (
                     <th key={h} className="px-3 py-[9px] text-left text-[0.72rem] font-semibold text-[#64748b] uppercase tracking-[0.05em] border-b-2 border-[#dde3f0] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -199,7 +211,7 @@ export function EventsPage() {
                     onClick={() => navigate(`/companies/${companyId}/events/${e['id']}`)}
                   >
                     <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle font-semibold">{e['eventName'] as string}</td>
-                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">{formatDate(e['eventDate'] as string)}</td>
+                    <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">{eventDate(e['eventDate'] as string)}</td>
                     <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">
                       <span className="text-[0.8rem] bg-[#f1f5f9] px-2 py-[2px] rounded-full">
                         {(e['status'] as string) || '—'}
@@ -211,8 +223,8 @@ export function EventsPage() {
                     </td>
                     <td className="px-3 py-[11px] border-b border-[#f1f5f9] align-middle">
                       {e['isFinalized']
-                        ? <span className="finalized-badge-large">FINALIZED</span>
-                        : <span className="text-[#64748b] text-[0.82rem]">No</span>}
+                        ? <span className="finalized-badge-large">{t('list.finalizedBadge', 'FINALIZED')}</span>
+                        : <span className="text-[#64748b] text-[0.82rem]">{t('list.no', 'No')}</span>}
                     </td>
                   </tr>
                 ))}

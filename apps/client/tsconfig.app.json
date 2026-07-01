@@ -13,7 +13,8 @@
     ],
     "rootDir": "src",
     "module": "esnext",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true
   },
   "exclude": [
     "out-tsc",

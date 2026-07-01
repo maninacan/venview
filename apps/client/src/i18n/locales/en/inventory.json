@@ -1,0 +1,59 @@
+{
+  "heading": "📦 My Inventory",
+  "subtitle": "Upload your product catalog once — venOS tracks stock and calculates COGS automatically after every Square sync.",
+  "aiImport": "AI Import",
+  "analyzing": "Analyzing…",
+  "clearAll": "Clear All",
+  "searchPlaceholder": "Search items…",
+  "allCategories": "All Categories",
+  "loading": "Loading…",
+  "emptyNoItems": "No inventory items yet — upload a CSV or items will appear here.",
+  "emptyNoMatch": "No items match your search.",
+  "table": {
+    "item": "Item",
+    "category": "Category",
+    "unitCost": "Unit Cost",
+    "onHand": "On Hand",
+    "reorderAt": "Reorder At"
+  },
+  "low": "LOW",
+  "save": "Save",
+  "cancel": "Cancel",
+  "itemCount_one": "{{count}} item",
+  "itemCount_other": "{{count}} items",
+  "confirmDelete": "Delete this item?",
+  "confirmClearAll": "Delete ALL inventory items? This cannot be undone.",
+  "streaming": {
+    "parseErrorTitle": "Parse Error — Raw Output",
+    "analyzingTitle": "Claude is analyzing your file…",
+    "largeFileNote": "This may take a few minutes for large files.",
+    "close": "Close"
+  },
+  "review": {
+    "title": "Review AI-Parsed Inventory",
+    "detected_one": "{{count}} item detected. Edit or delete any before saving. Existing items with the same name will be updated.",
+    "detected_other": "{{count}} items detected. Edit or delete any before saving. Existing items with the same name will be updated.",
+    "name": "Name",
+    "category": "Category",
+    "unitCost": "Unit Cost",
+    "onHand": "On Hand",
+    "reorder": "Reorder",
+    "sku": "SKU",
+    "namePlaceholder": "Item name",
+    "categoryPlaceholder": "Category",
+    "skuPlaceholder": "SKU",
+    "approveAll": "Approve All ({{count}})",
+    "discardBatch": "Discard Batch"
+  },
+  "toast": {
+    "saveFailed": "Failed to save",
+    "cleared": "Inventory cleared",
+    "parseFailed": "JSON parse failed: {{reason}}\n\nThe output above is what Claude returned. It may be truncated or contain unexpected text.",
+    "noItemsFound": "No items found in that file. Try a different file.",
+    "importFailed": "Import failed",
+    "uploadFailed": "Upload failed",
+    "saved_one": "Saved {{count}} item!",
+    "saved_other": "Saved {{count}} items!",
+    "savedWithFailures": "Saved {{saved}}, but {{failed}} failed. Please retry the rest."
+  }
+}

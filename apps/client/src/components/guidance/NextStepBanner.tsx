@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   eyebrow?: string;
@@ -13,12 +14,13 @@ interface Props {
 
 // Prominent "what to do next" card. Reused on the Home page and Event Dashboard.
 export function NextStepBanner({ eyebrow, title, description, ctaLabel, to, onClick, onDismiss }: Props) {
+  const { t } = useTranslation('onboarding');
   return (
     <div className="relative bg-gradient-to-br from-[#0B2A4A] to-[#0A3A67] text-white rounded-xl px-5 py-4 mb-4 shadow-[0_4px_12px_rgba(11,42,74,0.18)]">
       {onDismiss && (
         <button
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label={t('banner.dismiss', 'Dismiss')}
           className="absolute top-2.5 right-3 text-[rgba(255,255,255,0.6)] hover:text-white bg-transparent border-0 cursor-pointer text-[0.95rem]"
         >
           <i className="fa-solid fa-xmark" />

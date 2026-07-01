@@ -1,7 +1,10 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
+import { useTranslation } from 'react-i18next';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
+import { useCurrency } from '../../i18n/useCurrency';
+import { formatDate } from '../../i18n/format';
 import { showToast } from '@org/data';
 
 const GET_REPORT = gql`
@@ -32,19 +35,7 @@ const GET_REPORT = gql`
   }
 `;
 
-function fmt(v: number | null | undefined) { return `$${Number(v ?? 0).toFixed(2)}`; }
-function formatDate(d: string | null | undefined) {
-  if (!d) return '—';
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-function formatDateRange(start: string | null | undefined, numDays: number | null | undefined) {
-  if (!start) return '';
-  const s = formatDate(start);
-  if (!numDays || numDays <= 1) return s;
-  const end = new Date(start + 'T00:00:00');
-  end.setDate(end.getDate() + numDays - 1);
-  return `${s} – ${end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
-}
+const LONG_DATE: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
 
 function Row({ label, value, bold, color }: { label: string; value: string; bold?: boolean; color?: string }) {
   return (
@@ -64,9 +55,21 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 export function PostEventReportPage() {
+  const { t } = useTranslation('events');
+  const { fmt } = useCurrency();
   const { eventId } = useParams<{ eventId: string }>();
   const { companyId } = useCurrentCompany();
   const navigate = useNavigate();
+
+  const eventDate = (d: string | null | undefined) => (d ? formatDate(d, LONG_DATE) : '—');
+  const formatDateRange = (start: string | null | undefined, numDays: number | null | undefined) => {
+    if (!start) return '';
+    const s = eventDate(start);
+    if (!numDays || numDays <= 1) return s;
+    const end = new Date(start + 'T00:00:00');
+    end.setDate(end.getDate() + numDays - 1);
+    return t('report.dateRange', '{{start}} – {{end}}', { start: s, end: formatDate(end, LONG_DATE) });
+  };
 
   const { data, loading, error } = useQuery(GET_REPORT, {
     variables: { id: eventId },
@@ -107,46 +110,46 @@ export function PostEventReportPage() {
       const profitColor = netProfit >= 0 ? '#166534' : '#991b1b';
 
       const content: unknown[] = [
-        { text: event?.eventName ?? 'Post-Event Report', style: 'title' },
+        { text: event?.eventName ?? t('report.title', 'Post-Event Report'), style: 'title' },
         { text: formatDateRange(event?.eventDate, event?.numDays), style: 'subtitle', margin: [0, 0, 0, 16] },
 
         // Event summary chips
-        ...(event?.status ? [{ text: `Status: ${event.status}`, style: 'chip' }] : []),
-        ...(event?.eventHost ? [{ text: `Host: ${event.eventHost}`, style: 'chip' }] : []),
-        ...(event?.eventLocation ? [{ text: `Location: ${event.eventLocation}`, style: 'chip' }] : []),
+        ...(event?.status ? [{ text: t('report.chip.status', 'Status: {{value}}', { value: event.status }), style: 'chip' }] : []),
+        ...(event?.eventHost ? [{ text: t('report.chip.host', 'Host: {{value}}', { value: event.eventHost }), style: 'chip' }] : []),
+        ...(event?.eventLocation ? [{ text: t('report.chip.location', 'Location: {{value}}', { value: event.eventLocation }), style: 'chip' }] : []),
 
-        { text: 'Sales Summary', style: 'sectionHeader', margin: [0, 16, 0, 4] },
+        { text: t('report.salesSummary', 'Sales Summary'), style: 'sectionHeader', margin: [0, 16, 0, 4] },
         buildTable([
           ['', ''],
-          ['Gross Sales', fmt(sales.grossSales)],
-          ['Returns', `-${fmt(sales.refunds)}`],
-          ['Discounts', `-${fmt(sales.discounts)}`],
-          ['Net Sales', fmt(sales.netSales)],
+          [t('report.grossSales', 'Gross Sales'), fmt(sales.grossSales)],
+          [t('report.returns', 'Returns'), `-${fmt(sales.refunds)}`],
+          [t('report.discounts', 'Discounts'), `-${fmt(sales.discounts)}`],
+          [t('report.netSales', 'Net Sales'), fmt(sales.netSales)],
         ]),
 
-        { text: 'Cost of Goods Sold', style: 'sectionHeader', margin: [0, 12, 0, 4] },
+        { text: t('report.cogsTitle', 'Cost of Goods Sold'), style: 'sectionHeader', margin: [0, 12, 0, 4] },
         buildTable([
           ['', ''],
-          ['Ingredient Costs (COGS)', `-${fmt(summary.cogs)}`],
-          ['Gross Profit', fmt(summary.grossProfit)],
+          [t('report.ingredientCostsCogs', 'Ingredient Costs (COGS)'), `-${fmt(summary.cogs)}`],
+          [t('report.grossProfit', 'Gross Profit'), fmt(summary.grossProfit)],
         ]),
       ];
 
       // Labor table
       if (laborEntries.length > 0) {
-        content.push({ text: 'Labor', style: 'sectionHeader', margin: [0, 12, 0, 4] });
+        content.push({ text: t('report.labor', 'Labor'), style: 'sectionHeader', margin: [0, 12, 0, 4] });
         content.push({
           table: {
             widths: ['*', 'auto', 'auto', 'auto'],
             body: [
-              [{ text: 'Name', bold: true }, { text: 'Hours', bold: true }, { text: 'Wage', bold: true }, { text: 'Total', bold: true }],
+              [{ text: t('report.laborName', 'Name'), bold: true }, { text: t('report.laborHours', 'Hours'), bold: true }, { text: t('report.laborWage', 'Wage'), bold: true }, { text: t('report.laborTotal', 'Total'), bold: true }],
               ...laborEntries.map((r: Record<string, unknown>) => [
                 String(r['name'] ?? ''),
                 String(Number(r['hours']).toFixed(2)),
-                `$${Number(r['wage']).toFixed(2)}/hr`,
+                t('report.wagePerHour', '{{amount}}/hr', { amount: fmt(r['wage'] as number) }),
                 fmt(r['total'] as number),
               ]),
-              [{ text: 'Total Labor', bold: true, colSpan: 3 }, {}, {}, { text: fmt(summary.laborFees), bold: true }],
+              [{ text: t('report.totalLabor', 'Total Labor'), bold: true, colSpan: 3 }, {}, {}, { text: fmt(summary.laborFees), bold: true }],
             ],
           },
           layout: 'lightHorizontalLines',
@@ -156,12 +159,12 @@ export function PostEventReportPage() {
 
       // Supplies table
       if (supplies.length > 0) {
-        content.push({ text: 'Supplies', style: 'sectionHeader', margin: [0, 12, 0, 4] });
+        content.push({ text: t('report.supplies', 'Supplies'), style: 'sectionHeader', margin: [0, 12, 0, 4] });
         content.push({
           table: {
             widths: ['*', 'auto', 'auto', 'auto'],
             body: [
-              [{ text: 'Item', bold: true }, { text: 'Qty', bold: true }, { text: 'Unit Cost', bold: true }, { text: 'Total', bold: true }],
+              [{ text: t('report.suppliesItem', 'Item'), bold: true }, { text: t('report.suppliesQty', 'Qty'), bold: true }, { text: t('report.suppliesUnitCost', 'Unit Cost'), bold: true }, { text: t('report.suppliesTotal', 'Total'), bold: true }],
               ...supplies.map((r: Record<string, unknown>) => [
                 String(r['name'] ?? ''),
                 String(Number(r['quantity']).toFixed(2)),
@@ -176,19 +179,19 @@ export function PostEventReportPage() {
       }
 
       // Expenses
-      content.push({ text: 'Operating Expenses', style: 'sectionHeader', margin: [0, 12, 0, 4] });
+      content.push({ text: t('report.operatingExpenses', 'Operating Expenses'), style: 'sectionHeader', margin: [0, 12, 0, 4] });
       content.push(buildTable([
         ['', ''],
-        ['Health Dept Fee', `-${fmt(expenses.healthDeptFee)}`],
-        ['Event Fee', `-${fmt(expenses.eventFee)}`],
-        ['Mileage Reimbursement', `-${fmt(summary.mileageReimbursement)}`],
-        ['Employee Bonus', `-${fmt(expenses.employeeBonus)}`],
-        ['Event Runner Fees', `-${fmt(expenses.eventRunnerFees)}`],
-        ['Labor Fees', `-${fmt(summary.laborFees)}`],
-        ['Coordinator Fee', `-${fmt(expenses.coordinatorFee)}`],
-        ['POS Fees', `-${fmt(summary.posFees)}`],
-        ['Additional Fees', `-${fmt(summary.additionalFeesTotal)}`],
-        ['Total Operating Expenses', `-${fmt(summary.totalExpenses)}`],
+        [t('report.healthDeptFee', 'Health Dept Fee'), `-${fmt(expenses.healthDeptFee)}`],
+        [t('report.eventFee', 'Event Fee'), `-${fmt(expenses.eventFee)}`],
+        [t('report.mileageReimbursement', 'Mileage Reimbursement'), `-${fmt(summary.mileageReimbursement)}`],
+        [t('report.employeeBonus', 'Employee Bonus'), `-${fmt(expenses.employeeBonus)}`],
+        [t('report.eventRunnerFees', 'Event Runner Fees'), `-${fmt(expenses.eventRunnerFees)}`],
+        [t('report.laborFees', 'Labor Fees'), `-${fmt(summary.laborFees)}`],
+        [t('report.coordinatorFee', 'Coordinator Fee'), `-${fmt(expenses.coordinatorFee)}`],
+        [t('report.posFees', 'POS Fees'), `-${fmt(summary.posFees)}`],
+        [t('report.additionalFees', 'Additional Fees'), `-${fmt(summary.additionalFeesTotal)}`],
+        [t('report.totalOperatingExpenses', 'Total Operating Expenses'), `-${fmt(summary.totalExpenses)}`],
       ]));
 
       // Net Profit
@@ -196,7 +199,7 @@ export function PostEventReportPage() {
         table: {
           widths: ['*', 'auto'],
           body: [[
-            { text: 'NET PROFIT', bold: true, fontSize: 14 },
+            { text: t('report.netProfit', 'NET PROFIT'), bold: true, fontSize: 14 },
             { text: fmt(netProfit), bold: true, fontSize: 14, color: profitColor },
           ]],
         },
@@ -205,13 +208,13 @@ export function PostEventReportPage() {
       });
 
       // For your records
-      content.push({ text: 'For Your Records (Informational)', style: 'sectionHeader', margin: [0, 12, 0, 4] });
+      content.push({ text: t('report.forYourRecords', 'For Your Records (Informational)'), style: 'sectionHeader', margin: [0, 12, 0, 4] });
       content.push(buildTable([
         ['', ''],
-        ['Tips (pass-through to staff)', fmt(summary.tips)],
-        [`Sales tax — ${taxes.jurisdiction?.state ?? 'State'} (${(Number(taxes.stateRate ?? 0) * 100).toFixed(2)}%)`, fmt(Number(taxes.stateTax ?? 0))],
-        [`Sales tax — ${taxes.jurisdiction?.city ?? taxes.jurisdiction?.county ?? 'Local'} (${(Number(taxes.localRate ?? 0) * 100).toFixed(2)}%)`, fmt(Number(taxes.localTax ?? 0))],
-        ['Total sales tax collected (to remit)', fmt(Number(taxes.taxCollected ?? 0))],
+        [t('report.tipsPassThrough', 'Tips (pass-through to staff)'), fmt(summary.tips)],
+        [t('report.salesTaxState', 'Sales tax — {{name}} ({{rate}}%)', { name: taxes.jurisdiction?.state ?? t('report.stateFallback', 'State'), rate: (Number(taxes.stateRate ?? 0) * 100).toFixed(2) }), fmt(Number(taxes.stateTax ?? 0))],
+        [t('report.salesTaxLocal', 'Sales tax — {{name}} ({{rate}}%)', { name: taxes.jurisdiction?.city ?? taxes.jurisdiction?.county ?? t('report.localFallback', 'Local'), rate: (Number(taxes.localRate ?? 0) * 100).toFixed(2) }), fmt(Number(taxes.localTax ?? 0))],
+        [t('report.totalSalesTaxCollected', 'Total sales tax collected (to remit)'), fmt(Number(taxes.taxCollected ?? 0))],
       ]));
 
       const docDef = {
@@ -226,9 +229,9 @@ export function PostEventReportPage() {
       };
 
       pdfMake.createPdf(docDef).download(`PostEventReport_${(event?.eventName ?? 'Event').replace(/[^a-z0-9]/gi, '_')}.pdf`);
-      showToast('PDF downloaded!', 'success');
+      showToast(t('toast.pdfDownloaded', 'PDF downloaded!'), 'success');
     } catch (err) {
-      showToast('PDF export failed: ' + (err instanceof Error ? err.message : 'unknown error'), 'error');
+      showToast(t('toast.pdfFailed', 'PDF export failed: {{error}}', { error: err instanceof Error ? err.message : t('toast.unknownError', 'unknown error') }), 'error');
     }
   }
 
@@ -237,7 +240,7 @@ export function PostEventReportPage() {
   }
 
   if (error || !report) {
-    return <div className="inline-error"><span>⚠️</span><span>Could not load report. {error?.message}</span></div>;
+    return <div className="inline-error"><span>⚠️</span><span>{t('report.loadError', 'Could not load report.')} {error?.message}</span></div>;
   }
 
   const netProfit = Number(summary.netProfit ?? 0);
@@ -252,9 +255,9 @@ export function PostEventReportPage() {
     <>
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn-primary" onClick={downloadPDF}>📄 Download PDF</button>
-        <button className="btn-secondary" onClick={() => window.print()}>🖨 Print</button>
-        <Link to={`/companies/${companyId}/events/${eventId}`} className="btn-secondary" style={{ textDecoration: 'none' }}>⬅ Back to Dashboard</Link>
+        <button className="btn-primary" onClick={downloadPDF}>{t('report.downloadPdf', '📄 Download PDF')}</button>
+        <button className="btn-secondary" onClick={() => window.print()}>{t('report.print', '🖨 Print')}</button>
+        <Link to={`/companies/${companyId}/events/${eventId}`} className="btn-secondary" style={{ textDecoration: 'none' }}>{t('report.backToDashboard', '⬅ Back to Dashboard')}</Link>
       </div>
 
       {/* Report card */}
@@ -262,48 +265,48 @@ export function PostEventReportPage() {
         {/* Header */}
         <div style={{ borderBottom: '2px solid var(--vv-navy)', paddingBottom: 16, marginBottom: 20 }}>
           <h1 style={{ margin: '0 0 4px', fontSize: '1.6rem', color: 'var(--vv-navy)', fontFamily: 'DM Serif Display, serif' }}>
-            <i className="fa-solid fa-chart-bar" /> Post-Event Report
+            <i className="fa-solid fa-chart-bar" /> {t('report.title', 'Post-Event Report')}
           </h1>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--vv-navy)', marginBottom: 2 }}>
             {event?.eventName}
           </div>
           <div style={{ fontSize: '0.88rem', color: 'var(--muted)' }}>
             {formatDateRange(event?.eventDate, event?.numDays)}
-            {event?.isFinalized && <span className="finalized-badge-large" style={{ marginLeft: 10 }}>FINALIZED</span>}
+            {event?.isFinalized && <span className="finalized-badge-large" style={{ marginLeft: 10 }}>{t('report.finalizedBadge', 'FINALIZED')}</span>}
           </div>
           {/* Meta */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12, fontSize: '0.85rem', color: 'var(--muted)' }}>
-            {event?.status && <span><strong>Status:</strong> {event.status}</span>}
-            {event?.eventHost && <span><strong>Host:</strong> {event.eventHost}</span>}
-            {event?.eventLocation && <span><strong>Location:</strong> {event.eventLocation}</span>}
-            {event?.coordinator && <span><strong>Coordinator:</strong> {event.coordinator}</span>}
+            {event?.status && <span><strong>{t('report.metaStatus', 'Status:')}</strong> {event.status}</span>}
+            {event?.eventHost && <span><strong>{t('report.metaHost', 'Host:')}</strong> {event.eventHost}</span>}
+            {event?.eventLocation && <span><strong>{t('report.metaLocation', 'Location:')}</strong> {event.eventLocation}</span>}
+            {event?.coordinator && <span><strong>{t('report.metaCoordinator', 'Coordinator:')}</strong> {event.coordinator}</span>}
           </div>
         </div>
 
         {/* Sales Summary */}
-        <SectionHeader title="Sales Summary" />
-        <Row label="Gross Sales" value={fmt(sales.grossSales)} />
-        <Row label="Returns" value={`-${fmt(sales.refunds)}`} />
-        <Row label="Discounts" value={`-${fmt(sales.discounts)}`} />
-        <Row label="Net Sales" value={fmt(sales.netSales)} bold />
+        <SectionHeader title={t('report.salesSummary', 'Sales Summary')} />
+        <Row label={t('report.grossSales', 'Gross Sales')} value={fmt(sales.grossSales)} />
+        <Row label={t('report.returns', 'Returns')} value={`-${fmt(sales.refunds)}`} />
+        <Row label={t('report.discounts', 'Discounts')} value={`-${fmt(sales.discounts)}`} />
+        <Row label={t('report.netSales', 'Net Sales')} value={fmt(sales.netSales)} bold />
 
         {/* COGS */}
-        <SectionHeader title="Cost of Goods Sold (COGS)" />
-        <Row label="Ingredient Costs" value={`-${fmt(summary.cogs)}`} />
-        <Row label="Gross Profit" value={fmt(summary.grossProfit)} bold
+        <SectionHeader title={t('report.cogsTitleFull', 'Cost of Goods Sold (COGS)')} />
+        <Row label={t('report.ingredientCosts', 'Ingredient Costs')} value={`-${fmt(summary.cogs)}`} />
+        <Row label={t('report.grossProfit', 'Gross Profit')} value={fmt(summary.grossProfit)} bold
           color={Number(summary.grossProfit ?? 0) >= 0 ? '#166534' : '#991b1b'} />
 
         {/* Labor */}
         {laborEntries.length > 0 && (
           <>
-            <SectionHeader title="Labor" />
+            <SectionHeader title={t('report.labor', 'Labor')} />
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', marginBottom: 8 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 600 }}>Name</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Hours</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Wage</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Total</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 600 }}>{t('report.laborName', 'Name')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.laborHours', 'Hours')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.laborWage', 'Wage')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.laborTotal', 'Total')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -311,27 +314,27 @@ export function PostEventReportPage() {
                   <tr key={i}>
                     <td style={{ padding: '4px 8px', borderBottom: '1px solid #f1f5f9' }}>{r['name'] as string}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{Number(r['hours']).toFixed(2)}</td>
-                    <td style={{ padding: '4px 8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>${Number(r['wage']).toFixed(2)}/hr</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>{t('report.wagePerHour', '{{amount}}/hr', { amount: fmt(r['wage'] as number) })}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', borderBottom: '1px solid #f1f5f9', fontWeight: 600 }}>{fmt(r['total'] as number)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <Row label="Total Labor" value={`-${fmt(summary.laborFees)}`} bold />
+            <Row label={t('report.totalLabor', 'Total Labor')} value={`-${fmt(summary.laborFees)}`} bold />
           </>
         )}
 
         {/* Supplies */}
         {supplies.length > 0 && (
           <>
-            <SectionHeader title="Supplies" />
+            <SectionHeader title={t('report.supplies', 'Supplies')} />
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', marginBottom: 8 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 600 }}>Item</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Qty</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Unit Cost</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Total</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 600 }}>{t('report.suppliesItem', 'Item')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.suppliesQty', 'Qty')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.suppliesUnitCost', 'Unit Cost')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.suppliesTotal', 'Total')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -351,14 +354,14 @@ export function PostEventReportPage() {
         {/* Inventory Sales */}
         {inventorySales.length > 0 && (
           <>
-            <SectionHeader title="Items Sold (Inventory)" />
+            <SectionHeader title={t('report.itemsSold', 'Items Sold (Inventory)')} />
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', marginBottom: 8 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 600 }}>Item</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Qty Sold</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Unit Cost</th>
-                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>Total COGS</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 600 }}>{t('report.suppliesItem', 'Item')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.qtySold', 'Qty Sold')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.suppliesUnitCost', 'Unit Cost')}</th>
+                  <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600 }}>{t('report.totalCogs', 'Total COGS')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -376,32 +379,32 @@ export function PostEventReportPage() {
         )}
 
         {/* Operating Expenses */}
-        <SectionHeader title="Operating Expenses" />
-        {Number(expenses.healthDeptFee ?? 0) > 0 && <Row label="Health Dept Fee" value={`-${fmt(expenses.healthDeptFee)}`} />}
-        {Number(expenses.eventFee ?? 0) > 0 && <Row label="Event Fee" value={`-${fmt(expenses.eventFee)}`} />}
-        {Number(summary.mileageReimbursement ?? 0) > 0 && <Row label="Mileage Reimbursement" value={`-${fmt(summary.mileageReimbursement)}`} />}
-        {Number(expenses.employeeBonus ?? 0) > 0 && <Row label="Employee Bonus" value={`-${fmt(expenses.employeeBonus)}`} />}
-        {Number(expenses.eventRunnerFees ?? 0) > 0 && <Row label="Event Runner Fees" value={`-${fmt(expenses.eventRunnerFees)}`} />}
-        {Number(summary.laborFees ?? 0) > 0 && <Row label="Labor Fees" value={`-${fmt(summary.laborFees)}`} />}
-        {Number(expenses.coordinatorFee ?? 0) > 0 && <Row label="Coordinator Fee" value={`-${fmt(expenses.coordinatorFee)}`} />}
-        {Number(summary.posFees ?? 0) > 0 && <Row label="POS Fees" value={`-${fmt(summary.posFees)}`} />}
-        {Number(summary.additionalFeesTotal ?? 0) !== 0 && <Row label="Additional Fees / Discounts" value={`-${fmt(summary.additionalFeesTotal)}`} />}
-        <Row label="Total Operating Expenses" value={`-${fmt(summary.totalExpenses)}`} bold />
+        <SectionHeader title={t('report.operatingExpenses', 'Operating Expenses')} />
+        {Number(expenses.healthDeptFee ?? 0) > 0 && <Row label={t('report.healthDeptFee', 'Health Dept Fee')} value={`-${fmt(expenses.healthDeptFee)}`} />}
+        {Number(expenses.eventFee ?? 0) > 0 && <Row label={t('report.eventFee', 'Event Fee')} value={`-${fmt(expenses.eventFee)}`} />}
+        {Number(summary.mileageReimbursement ?? 0) > 0 && <Row label={t('report.mileageReimbursement', 'Mileage Reimbursement')} value={`-${fmt(summary.mileageReimbursement)}`} />}
+        {Number(expenses.employeeBonus ?? 0) > 0 && <Row label={t('report.employeeBonus', 'Employee Bonus')} value={`-${fmt(expenses.employeeBonus)}`} />}
+        {Number(expenses.eventRunnerFees ?? 0) > 0 && <Row label={t('report.eventRunnerFees', 'Event Runner Fees')} value={`-${fmt(expenses.eventRunnerFees)}`} />}
+        {Number(summary.laborFees ?? 0) > 0 && <Row label={t('report.laborFees', 'Labor Fees')} value={`-${fmt(summary.laborFees)}`} />}
+        {Number(expenses.coordinatorFee ?? 0) > 0 && <Row label={t('report.coordinatorFee', 'Coordinator Fee')} value={`-${fmt(expenses.coordinatorFee)}`} />}
+        {Number(summary.posFees ?? 0) > 0 && <Row label={t('report.posFees', 'POS Fees')} value={`-${fmt(summary.posFees)}`} />}
+        {Number(summary.additionalFeesTotal ?? 0) !== 0 && <Row label={t('report.additionalFeesDiscounts', 'Additional Fees / Discounts')} value={`-${fmt(summary.additionalFeesTotal)}`} />}
+        <Row label={t('report.totalOperatingExpenses', 'Total Operating Expenses')} value={`-${fmt(summary.totalExpenses)}`} bold />
 
         {/* Net Profit */}
         <div style={{ background: netProfit >= 0 ? '#f0fdf4' : '#fef2f2', border: `2px solid ${netProfit >= 0 ? '#bbf7d0' : '#fecaca'}`, borderRadius: 10, padding: '16px 18px', margin: '18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--vv-navy)' }}>NET PROFIT</span>
+          <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--vv-navy)' }}>{t('report.netProfit', 'NET PROFIT')}</span>
           <span style={{ fontWeight: 800, fontSize: '1.3rem', color: netProfit >= 0 ? '#166534' : '#991b1b', fontVariantNumeric: 'tabular-nums' }}>{fmt(netProfit)}</span>
         </div>
 
         {/* For your records */}
-        <SectionHeader title="For Your Records (Informational)" />
-        <Row label="Tips (pass-through to staff)" value={fmt(summary.tips)} />
-        <Row label={`Sales tax — remit to ${jur?.state ?? 'State'} (${(stateRate * 100).toFixed(2)}%)`} value={fmt(stateTax)} />
-        <Row label={`Sales tax — remit to ${jur?.city ?? jur?.county ?? 'Local'} (${(localRate * 100).toFixed(2)}%)`} value={fmt(localTax)} />
-        <Row label="Total sales tax collected (to remit)" value={fmt(taxCollected)} />
+        <SectionHeader title={t('report.forYourRecords', 'For Your Records (Informational)')} />
+        <Row label={t('report.tipsPassThrough', 'Tips (pass-through to staff)')} value={fmt(summary.tips)} />
+        <Row label={t('report.salesTaxRemitState', 'Sales tax — remit to {{name}} ({{rate}}%)', { name: jur?.state ?? t('report.stateFallback', 'State'), rate: (stateRate * 100).toFixed(2) })} value={fmt(stateTax)} />
+        <Row label={t('report.salesTaxRemitLocal', 'Sales tax — remit to {{name}} ({{rate}}%)', { name: jur?.city ?? jur?.county ?? t('report.localFallback', 'Local'), rate: (localRate * 100).toFixed(2) })} value={fmt(localTax)} />
+        <Row label={t('report.totalSalesTaxCollected', 'Total sales tax collected (to remit)')} value={fmt(taxCollected)} />
         <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: 8 }}>
-          ⓘ Income taxes are calculated annually — consult your accountant.
+          {t('report.incomeTaxNote', 'ⓘ Income taxes are calculated annually — consult your accountant.')}
         </p>
       </div>
     </>

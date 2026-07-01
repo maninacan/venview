@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { BackToSetupButton } from '../../components/guidance/BackToSetupButton';
 import { showToast } from '@org/data';
+import { useCurrency } from '../../i18n/useCurrency';
+import { formatNumber } from '../../i18n/format';
 
 const GET_INVENTORY = gql`
   query GetInventory($companyId: ID!) {
@@ -52,6 +55,12 @@ interface ImportedItem {
 const API_URL = (import.meta.env['VITE_API_URL'] as string) || 'http://localhost:3000';
 
 export function InventoryPage() {
+  const { t } = useTranslation('inventory');
+  const { currency } = useCurrency();
+  // Unit cost is shown to 4 decimals (sub-cent precision), which the 2-decimal
+  // currency formatter can't express — format as currency with 4 fraction digits.
+  const fmtUnitCost = (v: number) =>
+    formatNumber(v, { style: 'currency', currency, minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const { companyId } = useCurrentCompany();
   const aiFileInputRef = useRef<HTMLInputElement>(null);
   const streamOutputRef = useRef<HTMLDivElement>(null);
@@ -132,20 +141,20 @@ export function InventoryPage() {
       setEditingId(null);
       refetch();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to save', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.saveFailed', 'Failed to save'), 'error');
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this item?')) return;
+    if (!confirm(t('confirmDelete', 'Delete this item?'))) return;
     await deleteItem({ variables: { id } });
     refetch();
   }
 
   async function handleClearAll() {
-    if (!confirm('Delete ALL inventory items? This cannot be undone.')) return;
+    if (!confirm(t('confirmClearAll', 'Delete ALL inventory items? This cannot be undone.'))) return;
     await clearAll({ variables: { companyId } });
-    showToast('Inventory cleared', 'info');
+    showToast(t('toast.cleared', 'Inventory cleared'), 'info');
     refetch();
   }
 
@@ -172,7 +181,7 @@ export function InventoryPage() {
 
       if (!res.ok) {
         const error = await res.json() as { error: string };
-        throw new Error(error.error ?? 'Upload failed');
+        throw new Error(error.error ?? t('toast.uploadFailed', 'Upload failed'));
       }
 
       const reader = res.body!.getReader();
@@ -196,12 +205,12 @@ export function InventoryPage() {
       } catch (parseErr) {
         parseError = true;
         const reason = parseErr instanceof SyntaxError ? parseErr.message : String(parseErr);
-        setStreamingError(`JSON parse failed: ${reason}\n\nThe output above is what Claude returned. It may be truncated or contain unexpected text.`);
+        setStreamingError(t('toast.parseFailed', 'JSON parse failed: {{reason}}\n\nThe output above is what Claude returned. It may be truncated or contain unexpected text.', { reason }));
         return;
       }
 
       if (!parsed.items?.length) {
-        showToast('No items found in that file. Try a different file.', 'warning');
+        showToast(t('toast.noItemsFound', 'No items found in that file. Try a different file.'), 'warning');
         return;
       }
       setImportedItems(parsed.items.map(it => ({
@@ -215,7 +224,7 @@ export function InventoryPage() {
       })));
       setShowImportModal(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Import failed', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.importFailed', 'Import failed'), 'error');
     } finally {
       setAiUploading(false);
       if (!parseError) setIsStreaming(false);
@@ -266,10 +275,10 @@ export function InventoryPage() {
 
       refetch();
       if (failed === 0) {
-        showToast(`Saved ${saved} item${saved !== 1 ? 's' : ''}!`, 'success', 5000);
+        showToast(t('toast.saved', 'Saved {{count}} items!', { count: saved }), 'success', 5000);
         closeImportModal();
       } else {
-        showToast(`Saved ${saved}, but ${failed} failed. Please retry the rest.`, 'warning', 6000);
+        showToast(t('toast.savedWithFailures', 'Saved {{saved}}, but {{failed}} failed. Please retry the rest.', { saved, failed }), 'warning', 6000);
       }
     } finally { setApprovingAll(false); }
   }
@@ -279,15 +288,15 @@ export function InventoryPage() {
       <BackToSetupButton />
       <div className="card">
         <div className="mb-4">
-          <h2 className="mt-0 mb-1 text-[#0B2A4A]">📦 My Inventory{!loading && items.length > 0 && <span className="text-[#64748b] font-normal"> ({items.length})</span>}</h2>
-          <p className="text-[#64748b] text-[0.86rem] m-0">Upload your product catalog once — venOS tracks stock and calculates COGS automatically after every Square sync.</p>
+          <h2 className="mt-0 mb-1 text-[#0B2A4A]">{t('heading', '📦 My Inventory')}{!loading && items.length > 0 && <span className="text-[#64748b] font-normal"> ({items.length})</span>}</h2>
+          <p className="text-[#64748b] text-[0.86rem] m-0">{t('subtitle', 'Upload your product catalog once — venOS tracks stock and calculates COGS automatically after every Square sync.')}</p>
         </div>
 
         <div className="flex flex-wrap gap-2.5 mb-3.5 justify-between items-center">
           <div className="flex gap-2 items-center flex-wrap">
             <button className="btn-primary" onClick={() => aiFileInputRef.current?.click()} disabled={aiUploading}>
               <i className={aiUploading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'} />
-              <span>{aiUploading ? ' Analyzing…' : ' AI Import'}</span>
+              <span>{aiUploading ? ` ${t('analyzing', 'Analyzing…')}` : ` ${t('aiImport', 'AI Import')}`}</span>
             </button>
             <input
               type="file"
@@ -296,24 +305,24 @@ export function InventoryPage() {
               accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,.gif,.heic"
               onChange={handleAIUpload}
             />
-            <button className="btn-danger" onClick={handleClearAll}><i className="fa-solid fa-trash" /> Clear All</button>
+            <button className="btn-danger" onClick={handleClearAll}><i className="fa-solid fa-trash" /> {t('clearAll', 'Clear All')}</button>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
-            <input type="text" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 180 }} />
+            <input type="text" placeholder={t('searchPlaceholder', 'Search items…')} value={search} onChange={e => setSearch(e.target.value)} style={{ width: 180 }} />
             <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ width: 150 }}>
-              <option value="">All Categories</option>
+              <option value="">{t('allCategories', 'All Categories')}</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
 
-        {loading && <p className="text-[#64748b] text-[0.88rem]">Loading…</p>}
+        {loading && <p className="text-[#64748b] text-[0.88rem]">{t('loading', 'Loading…')}</p>}
 
         {!loading && filtered.length === 0 && (
           <p className="text-[#64748b] text-[0.86rem] py-8 text-center">
             {items.length === 0
-              ? 'No inventory items yet — upload a CSV or items will appear here.'
-              : 'No items match your search.'}
+              ? t('emptyNoItems', 'No inventory items yet — upload a CSV or items will appear here.')
+              : t('emptyNoMatch', 'No items match your search.')}
           </p>
         )}
 
@@ -322,11 +331,11 @@ export function InventoryPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>Item</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>Category</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>Unit Cost</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>On Hand</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>Reorder At</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>{t('table.item', 'Item')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>{t('table.category', 'Category')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>{t('table.unitCost', 'Unit Cost')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>{t('table.onHand', 'On Hand')}</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid var(--border)' }}>{t('table.reorderAt', 'Reorder At')}</th>
                   <th style={{ padding: '8px 10px', borderBottom: '2px solid var(--border)' }} />
                 </tr>
               </thead>
@@ -339,7 +348,7 @@ export function InventoryPage() {
                       <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
                         {isEditing
                           ? <input type="text" value={editVals['name']} onChange={e => setEditVals(v => ({ ...v, name: e.target.value }))} style={{ width: '100%' }} />
-                          : <><strong>{item.name}</strong>{isLow && <span style={{ marginLeft: 6, fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 99 }}>LOW</span>}</>}
+                          : <><strong>{item.name}</strong>{isLow && <span style={{ marginLeft: 6, fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 99 }}>{t('low', 'LOW')}</span>}</>}
                       </td>
                       <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
                         {isEditing
@@ -349,7 +358,7 @@ export function InventoryPage() {
                       <td style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>
                         {isEditing
                           ? <input type="number" step="0.0001" value={editVals['unitCost']} onChange={e => setEditVals(v => ({ ...v, unitCost: e.target.value }))} style={{ width: 80, textAlign: 'right' }} />
-                          : `$${Number(item.unitCost).toFixed(4)}`}
+                          : fmtUnitCost(Number(item.unitCost))}
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}>
                         {isEditing
@@ -364,8 +373,8 @@ export function InventoryPage() {
                       <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                         {isEditing ? (
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn-primary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => saveEdit(item.id)}>Save</button>
-                            <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => setEditingId(null)}>Cancel</button>
+                            <button className="btn-primary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => saveEdit(item.id)}>{t('save', 'Save')}</button>
+                            <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '3px 8px' }} onClick={() => setEditingId(null)}>{t('cancel', 'Cancel')}</button>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', gap: 6 }}>
@@ -379,7 +388,7 @@ export function InventoryPage() {
                 })}
               </tbody>
             </table>
-            <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0', textAlign: 'right' }}>{filtered.length} item{filtered.length !== 1 ? 's' : ''}</p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '8px 0 0', textAlign: 'right' }}>{t('itemCount', '{{count}} items', { count: filtered.length })}</p>
           </div>
         )}
       </div>
@@ -391,10 +400,10 @@ export function InventoryPage() {
             <div style={{ padding: '24px 28px 12px', flexShrink: 0 }}>
               <h3 style={{ margin: '0 0 4px', color: streamingError ? 'var(--danger)' : 'var(--vv-navy)' }}>
                 <i className={`fa-solid ${streamingError ? 'fa-triangle-exclamation' : 'fa-spinner fa-spin'}`} style={{ marginRight: 8 }} />
-                <span>{streamingError ? 'Parse Error — Raw Output' : 'Claude is analyzing your file…'}</span>
+                <span>{streamingError ? t('streaming.parseErrorTitle', 'Parse Error — Raw Output') : t('streaming.analyzingTitle', 'Claude is analyzing your file…')}</span>
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>{streamingError ?? 'This may take a few minutes for large files.'}</span>
+                <span>{streamingError ?? t('streaming.largeFileNote', 'This may take a few minutes for large files.')}</span>
                 {!streamingError && (
                   <span style={{ fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontSize: '0.88rem', color: 'var(--vv-navy)', fontWeight: 600 }}>
                     {`${Math.floor(streamingElapsed / 60)}:${String(streamingElapsed % 60).padStart(2, '0')}`}
@@ -411,7 +420,7 @@ export function InventoryPage() {
             <div style={{ padding: '12px 28px 24px', flexShrink: 0 }}>
               {streamingError && (
                 <button className="btn-secondary" onClick={() => { setIsStreaming(false); setStreamingError(null); }}>
-                  <span>Close</span>
+                  <span>{t('streaming.close', 'Close')}</span>
                 </button>
               )}
             </div>
@@ -427,31 +436,31 @@ export function InventoryPage() {
             <div style={{ padding: '28px 28px 12px', flexShrink: 0 }}>
               <h3 style={{ margin: '0 0 4px' }}>
                 <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--vv-navy)', marginRight: 8 }} />
-                <span>Review AI-Parsed Inventory</span>
+                <span>{t('review.title', 'Review AI-Parsed Inventory')}</span>
               </h3>
               <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
-                {importedItems.length} item{importedItems.length !== 1 ? 's' : ''} detected. Edit or delete any before saving. Existing items with the same name will be updated.
+                {t('review.detected', '{{count}} items detected. Edit or delete any before saving. Existing items with the same name will be updated.', { count: importedItems.length })}
               </p>
             </div>
 
             <div style={{ overflowY: 'auto', flex: 1, padding: '0 28px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 90px 80px 80px 1fr 28px', gap: '6px 8px', fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600, position: 'sticky', top: 0, background: '#fff', padding: '6px 0' }}>
-                <span>Name</span>
-                <span>Category</span>
-                <span style={{ textAlign: 'right' }}>Unit Cost</span>
-                <span style={{ textAlign: 'right' }}>On Hand</span>
-                <span style={{ textAlign: 'right' }}>Reorder</span>
-                <span>SKU</span>
+                <span>{t('review.name', 'Name')}</span>
+                <span>{t('review.category', 'Category')}</span>
+                <span style={{ textAlign: 'right' }}>{t('review.unitCost', 'Unit Cost')}</span>
+                <span style={{ textAlign: 'right' }}>{t('review.onHand', 'On Hand')}</span>
+                <span style={{ textAlign: 'right' }}>{t('review.reorder', 'Reorder')}</span>
+                <span>{t('review.sku', 'SKU')}</span>
                 <span />
               </div>
               {importedItems.map(it => (
                 <div key={it.tempId} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 90px 80px 80px 1fr 28px', gap: '4px 8px', marginBottom: 4, alignItems: 'center' }}>
-                  <input type="text" value={it.name} onChange={e => updateImportedItem(it.tempId, 'name', e.target.value)} placeholder="Item name" style={{ fontSize: '0.83rem' }} />
-                  <input type="text" value={it.category} onChange={e => updateImportedItem(it.tempId, 'category', e.target.value)} placeholder="Category" style={{ fontSize: '0.83rem' }} />
+                  <input type="text" value={it.name} onChange={e => updateImportedItem(it.tempId, 'name', e.target.value)} placeholder={t('review.namePlaceholder', 'Item name')} style={{ fontSize: '0.83rem' }} />
+                  <input type="text" value={it.category} onChange={e => updateImportedItem(it.tempId, 'category', e.target.value)} placeholder={t('review.categoryPlaceholder', 'Category')} style={{ fontSize: '0.83rem' }} />
                   <input type="number" step="0.0001" value={it.unitCost} onChange={e => updateImportedItem(it.tempId, 'unitCost', e.target.value)} style={{ fontSize: '0.83rem', textAlign: 'right' }} />
                   <input type="number" step="0.01" value={it.quantityOnHand} onChange={e => updateImportedItem(it.tempId, 'quantityOnHand', e.target.value)} style={{ fontSize: '0.83rem', textAlign: 'right' }} />
                   <input type="number" step="0.01" value={it.reorderThreshold} onChange={e => updateImportedItem(it.tempId, 'reorderThreshold', e.target.value)} style={{ fontSize: '0.83rem', textAlign: 'right' }} />
-                  <input type="text" value={it.sku} onChange={e => updateImportedItem(it.tempId, 'sku', e.target.value)} placeholder="SKU" style={{ fontSize: '0.83rem' }} />
+                  <input type="text" value={it.sku} onChange={e => updateImportedItem(it.tempId, 'sku', e.target.value)} placeholder={t('review.skuPlaceholder', 'SKU')} style={{ fontSize: '0.83rem' }} />
                   <button onClick={() => deleteImportedItem(it.tempId)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}><i className="fa-solid fa-xmark" /></button>
                 </div>
               ))}
@@ -460,10 +469,10 @@ export function InventoryPage() {
             <div style={{ display: 'flex', gap: 10, padding: '14px 28px 28px', borderTop: '1px solid rgba(11,42,74,0.08)', flexShrink: 0 }}>
               <button className="btn-primary" onClick={handleApproveAll} disabled={approvingAll || importedItems.length === 0}>
                 {approvingAll && <span className="spinner" />}
-                <span><i className="fa-solid fa-check" /> Approve All ({importedItems.length})</span>
+                <span><i className="fa-solid fa-check" /> {t('review.approveAll', 'Approve All ({{count}})', { count: importedItems.length })}</span>
               </button>
               <button className="btn-danger-subtle" onClick={closeImportModal} disabled={approvingAll}>
-                <span><i className="fa-solid fa-trash" /> Discard Batch</span>
+                <span><i className="fa-solid fa-trash" /> {t('review.discardBatch', 'Discard Batch')}</span>
               </button>
             </div>
           </div>

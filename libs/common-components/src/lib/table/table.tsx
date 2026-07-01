@@ -285,6 +285,7 @@ export function Table<T extends BasicTableDataRow>({
               onPageChange={pagination.onPageChange}
               onItemsPerPageChange={pagination.onItemsPerPageChange}
               currentPage={pagination.currentPage}
+              labels={pagination.labels}
             />
           </div>
         )}

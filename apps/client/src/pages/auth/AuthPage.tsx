@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@org/data';
 import venviewLogo from '../../assets/venview-icon-lg.png';
@@ -6,6 +7,7 @@ import venviewLogo from '../../assets/venview-icon-lg.png';
 type AuthMode = 'signin' | 'signup';
 
 export function AuthPage() {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -60,7 +62,7 @@ export function AuthPage() {
           options: { emailRedirectTo: window.location.origin + '/auth' },
         });
         if (authError) {
-          setError(authError.message || 'Authentication failed.');
+          setError(authError.message || t('error.authFailed', 'Authentication failed.'));
         } else if (data.session) {
           // Email confirmation disabled — signed in immediately.
           navigate(returnTo ?? '/companies');
@@ -71,13 +73,13 @@ export function AuthPage() {
       } else {
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (authError) {
-          setError(authError.message || 'Authentication failed.');
+          setError(authError.message || t('error.authFailed', 'Authentication failed.'));
         } else {
           navigate(returnTo ?? '/companies');
         }
       }
     } catch {
-      setError('Unable to connect. Please try again.');
+      setError(t('error.connect', 'Unable to connect. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -93,15 +95,15 @@ export function AuthPage() {
       if (resetErr) { setResetError(resetErr.message); return; }
       setResetStatus('sent');
     } catch {
-      setResetError('Could not send reset email. Please try again.');
+      setResetError(t('error.sendReset', 'Could not send reset email. Please try again.'));
     }
   }
 
   async function handleSetNewPassword(e: FormEvent) {
     e.preventDefault();
     setSetPasswordError('');
-    if (newPassword !== confirmPassword) { setSetPasswordError('Passwords do not match.'); return; }
-    if (newPassword.length < 8) { setSetPasswordError('Password must be at least 8 characters.'); return; }
+    if (newPassword !== confirmPassword) { setSetPasswordError(t('error.passwordsDoNotMatch', 'Passwords do not match.')); return; }
+    if (newPassword.length < 8) { setSetPasswordError(t('error.passwordTooShort', 'Password must be at least 8 characters.')); return; }
 
     const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
     if (updateErr) { setSetPasswordError(updateErr.message); return; }
@@ -114,23 +116,23 @@ export function AuthPage() {
       {/* Header — matches the main app header */}
       <header className="bg-white px-5 h-[70px] flex items-center justify-between border-b border-[#dde3f0] shadow-[0_2px_6px_rgba(0,0,0,0.08)]">
         <Link to="/auth" className="flex items-center gap-2.5 no-underline">
-          <img src={venviewLogo} alt="venOS" className="h-[50px] w-auto" />
+          <img src={venviewLogo} alt={t('logoAlt', 'venOS')} className="h-[50px] w-auto" />
           <div>
             <span className="block text-[1.05rem] font-bold leading-tight" style={{ color: '#2E7D32' }}>
-              venOS Events
+              {t('brand', 'venOS Events')}
             </span>
-            <span className="block text-[0.68rem] text-[#666]">Vendor Intelligence for Events</span>
+            <span className="block text-[0.68rem] text-[#666]">{t('tagline', 'Vendor Intelligence for Events')}</span>
           </div>
         </Link>
-        <Link to="/auth" className="text-[0.87rem] text-[#222] no-underline hover:text-[#0B2A4A]">Home</Link>
+        <Link to="/auth" className="text-[0.87rem] text-[#222] no-underline hover:text-[#0B2A4A]">{t('home', 'Home')}</Link>
       </header>
 
       <div className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-[420px]">
         <div className="bg-white rounded-[20px] p-10 shadow-[0_12px_30px_rgba(11,42,74,0.12)] border border-[rgba(11,42,74,0.12)]">
           <div className="text-center mb-7">
-            <span className="block text-[1.4rem] font-semibold" style={{ color: '#2E7D32' }}>venOS Events</span>
-            <span className="block text-[0.8rem] text-[#64748b] mt-0.5">Vendor Intelligence for Events</span>
+            <span className="block text-[1.4rem] font-semibold" style={{ color: '#2E7D32' }}>{t('brand', 'venOS Events')}</span>
+            <span className="block text-[0.8rem] text-[#64748b] mt-0.5">{t('tagline', 'Vendor Intelligence for Events')}</span>
           </div>
 
           {signupSent ? (
@@ -138,19 +140,25 @@ export function AuthPage() {
               <div className="text-[2.4rem] mb-2" style={{ color: '#2E7D32' }}>
                 <i className="fa-solid fa-envelope-circle-check" />
               </div>
-              <h2 className="mt-0 mb-1.5 text-[1.25rem] font-bold text-[#0B2A4A]">Check your email</h2>
+              <h2 className="mt-0 mb-1.5 text-[1.25rem] font-bold text-[#0B2A4A]">{t('signupSent.title', 'Check your email')}</h2>
               <p className="mt-0 mb-5 text-[0.88rem] text-[#64748b]">
-                We've sent a verification link to <strong className="text-[#0B2A4A]">{email}</strong>. Click it to activate your account, then sign in.
+                <Trans
+                  i18nKey="signupSent.body"
+                  ns="auth"
+                  defaults="We've sent a verification link to <1>{{email}}</1>. Click it to activate your account, then sign in."
+                  values={{ email }}
+                  components={{ 1: <strong className="text-[#0B2A4A]" /> }}
+                />
               </p>
               <button
                 type="button"
                 className="btn-primary w-full justify-center py-[11px] text-base"
                 onClick={() => { setSignupSent(false); setMode('signin'); setPassword(''); setError(''); }}
               >
-                <span>Back to Sign In</span>
+                <span>{t('signupSent.backToSignIn', 'Back to Sign In')}</span>
               </button>
               <p className="text-center text-[0.82rem] text-[#64748b] mt-3.5">
-                Didn't get it? Check your spam folder, or{' '}
+                {t('signupSent.didntGetItPrefix', "Didn't get it? Check your spam folder, or ")}
                 <a
                   href="#"
                   className="text-[#0B2A4A] font-semibold no-underline hover:underline"
@@ -166,28 +174,28 @@ export function AuthPage() {
                     else { setError(''); setResent(true); }
                   }}
                 >
-                  resend the email
+                  {t('signupSent.resendLink', 'resend the email')}
                 </a>.
               </p>
-              {resent && <div className="text-[#166534] text-[0.85rem] mt-1">Verification email resent.</div>}
+              {resent && <div className="text-[#166534] text-[0.85rem] mt-1">{t('signupSent.resent', 'Verification email resent.')}</div>}
               {error && <div className="text-[#dc2626] text-[0.85rem] mt-1">{error}</div>}
             </div>
           ) : (
           <>
           <h2 className="mt-0 mb-1.5 text-[1.25rem] font-bold text-[#0B2A4A]">
-            {mode === 'signin' ? 'Sign In' : 'Sign Up'}
+            {mode === 'signin' ? t('signIn', 'Sign In') : t('signUp', 'Sign Up')}
           </h2>
           <p className="mt-0 mb-5 text-[0.88rem] text-[#64748b]">
             {mode === 'signin'
-              ? 'Welcome back! Sign in to manage your events.'
-              : 'Create your account to get started.'}
+              ? t('signInSubtitle', 'Welcome back! Sign in to manage your events.')
+              : t('signUpSubtitle', 'Create your account to get started.')}
           </p>
 
           <form onSubmit={handleAuth}>
             <div className="flex flex-col gap-3 mb-4">
               <input
                 type="email"
-                placeholder="Email address"
+                placeholder={t('emailPlaceholder', 'Email address')}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -195,7 +203,7 @@ export function AuthPage() {
               />
               <input
                 type="password"
-                placeholder="Password"
+                placeholder={t('passwordPlaceholder', 'Password')}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
@@ -205,18 +213,18 @@ export function AuthPage() {
             <div className="text-[#dc2626] text-[0.85rem] min-h-5 mb-2">{error}</div>
             <button type="submit" className="btn-primary w-full justify-center py-[11px] text-base" disabled={loading}>
               {loading && <span className="spinner" />}
-              <span>{mode === 'signin' ? 'Sign In' : 'Sign Up'}</span>
+              <span>{mode === 'signin' ? t('signIn', 'Sign In') : t('signUp', 'Sign Up')}</span>
             </button>
           </form>
 
           <p className="text-center text-[0.85rem] text-[#64748b] mt-3.5">
-            {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+            {mode === 'signin' ? t('noAccount', "Don't have an account? ") : t('haveAccount', 'Already have an account? ')}
             <a
               href="#"
               className="text-[#0B2A4A] font-semibold no-underline hover:underline"
               onClick={e => { e.preventDefault(); setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(''); }}
             >
-              {mode === 'signin' ? 'Sign Up' : 'Sign In'}
+              {mode === 'signin' ? t('signUp', 'Sign Up') : t('signIn', 'Sign In')}
             </a>
           </p>
 
@@ -227,7 +235,7 @@ export function AuthPage() {
                 className="text-[0.82em] text-[#64748b] no-underline hover:underline"
                 onClick={e => { e.preventDefault(); setResetEmail(email); setShowForgot(true); }}
               >
-                Forgot Password?
+                {t('forgotPassword', 'Forgot Password?')}
               </a>
             </p>
           )}
@@ -242,20 +250,20 @@ export function AuthPage() {
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForgot(false); }}>
           <div className="modal-box" style={{ maxWidth: 400 }}>
             <button className="modal-close" onClick={() => setShowForgot(false)}><i className="fa-solid fa-xmark" /></button>
-            <h3 style={{ margin: '0 0 8px' }}>Reset Password</h3>
+            <h3 style={{ margin: '0 0 8px' }}>{t('reset.title', 'Reset Password')}</h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--muted)', margin: '0 0 16px' }}>
-              Enter your email and we'll send a reset link.
+              {t('reset.description', "Enter your email and we'll send a reset link.")}
             </p>
             {resetStatus === 'sent' ? (
               <p style={{ color: '#166534', fontSize: '0.9rem' }}>
-                Reset link sent! Check your email — click the link, then come back here to set your new password.
+                {t('reset.sent', 'Reset link sent! Check your email — click the link, then come back here to set your new password.')}
               </p>
             ) : (
               <form onSubmit={handleSendReset}>
                 <div className="form-group">
                   <input
                     type="email"
-                    placeholder="Email address"
+                    placeholder={t('emailPlaceholder', 'Email address')}
                     value={resetEmail}
                     onChange={e => setResetEmail(e.target.value)}
                     required
@@ -263,8 +271,8 @@ export function AuthPage() {
                 </div>
                 {resetError && <p className="form-error">{resetError}</p>}
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-                  <button type="button" className="btn-secondary" onClick={() => setShowForgot(false)}>Cancel</button>
-                  <button type="submit" className="btn-primary">Send Reset Link</button>
+                  <button type="button" className="btn-secondary" onClick={() => setShowForgot(false)}>{t('reset.cancel', 'Cancel')}</button>
+                  <button type="submit" className="btn-primary">{t('reset.sendLink', 'Send Reset Link')}</button>
                 </div>
               </form>
             )}
@@ -276,15 +284,15 @@ export function AuthPage() {
       {showSetPassword && (
         <div className="modal-overlay">
           <div className="modal-box" style={{ maxWidth: 400 }}>
-            <h3 style={{ margin: '0 0 8px' }}>Set New Password</h3>
+            <h3 style={{ margin: '0 0 8px' }}>{t('setPassword.title', 'Set New Password')}</h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--muted)', margin: '0 0 16px' }}>
-              Choose a new password for your account.
+              {t('setPassword.description', 'Choose a new password for your account.')}
             </p>
             <form onSubmit={handleSetNewPassword}>
               <div className="form-group">
                 <input
                   type="password"
-                  placeholder="New password"
+                  placeholder={t('setPassword.newPasswordPlaceholder', 'New password')}
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   required
@@ -295,7 +303,7 @@ export function AuthPage() {
               <div className="form-group">
                 <input
                   type="password"
-                  placeholder="Confirm new password"
+                  placeholder={t('setPassword.confirmPasswordPlaceholder', 'Confirm new password')}
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   required
@@ -305,7 +313,7 @@ export function AuthPage() {
               </div>
               {setPasswordError && <p className="form-error">{setPasswordError}</p>}
               <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                Update Password
+                {t('setPassword.update', 'Update Password')}
               </button>
             </form>
           </div>

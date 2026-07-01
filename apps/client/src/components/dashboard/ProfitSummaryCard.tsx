@@ -1,9 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { CollapsibleCard } from './CollapsibleCard';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { showToast } from '@org/data';
 import { useSpinner } from '../../hooks/useSpinner';
+import { useCurrency } from '../../i18n/useCurrency';
+import { formatPercent } from '../../i18n/format';
 
 const FINALIZE = gql`
   mutation FinalizeEvent($id: ID!) {
@@ -66,8 +69,6 @@ interface Props {
   onFinalized: () => void;
 }
 
-const fmt = (v: number | null | undefined) => `$${Number(v ?? 0).toFixed(2)}`;
-
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="text-[0.72rem] font-bold uppercase tracking-[0.06em] text-[#64748b] mt-3 mb-1.5">{children}</div>;
 }
@@ -103,6 +104,8 @@ function LedgerRow({ label, value, bold, final, info, profit }: {
 }
 
 export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summary, taxes, onFinalized }: Props) {
+  const { t } = useTranslation('home');
+  const { fmt } = useCurrency();
   const [finalizeEvent] = useMutation(FINALIZE);
   const { loading, withSpinner } = useSpinner();
 
@@ -113,12 +116,12 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
     await withSpinner(async () => {
       try {
         await finalizeEvent({ variables: { id: eventId } });
-        showToast('Event finalized!', 'success');
+        showToast(t('toast.eventFinalized', 'Event finalized!'), 'success');
         onFinalized();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to finalize';
+        const msg = err instanceof Error ? err.message : t('toast.finalizeFailed', 'Failed to finalize');
         if (msg.includes('FINALIZE_LIMIT_REACHED')) {
-          showToast('Upgrade to Pro to finalize more than 1 event.', 'warning', 5000);
+          showToast(t('toast.finalizeLimit', 'Upgrade to Pro to finalize more than 1 event.'), 'warning', 5000);
         } else {
           showToast(msg, 'error');
         }
@@ -132,48 +135,54 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
   const localTax = Number(taxes?.localTax ?? 0);
   const taxCollected = Number(taxes?.taxCollected ?? 0);
   const jName = taxes?.jurisdiction ?? null;
-  const stateLabel = `Sales tax — remit to ${jName?.state || 'State'} (${(stateRate * 100).toFixed(2)}%)`;
-  const localLabel = `Sales tax — remit to ${jName?.city || jName?.county || 'Local'} (${(localRate * 100).toFixed(2)}%)`;
+  const stateLabel = t('profit.salesTaxRemitState', 'Sales tax — remit to {{jurisdiction}} ({{rate}})', {
+    jurisdiction: jName?.state || t('profit.stateFallback', 'State'),
+    rate: formatPercent(stateRate),
+  });
+  const localLabel = t('profit.salesTaxRemitLocal', 'Sales tax — remit to {{jurisdiction}} ({{rate}})', {
+    jurisdiction: jName?.city || jName?.county || t('profit.localFallback', 'Local'),
+    rate: formatPercent(localRate),
+  });
 
   return (
-    <CollapsibleCard title="Event Profit Summary" defaultOpen={true}>
+    <CollapsibleCard title={t('profit.cardTitle', 'Event Profit Summary')} defaultOpen={true}>
       <div className="text-[0.88rem]">
         {/* Revenue */}
-        <SectionTitle>Revenue</SectionTitle>
-        <LedgerRow label="Gross Sales" value={fmt(sales.grossSales)} />
-        <LedgerRow label="Returns" value={`-${fmt(sales.refunds)}`} />
-        <LedgerRow label="Discounts" value={`-${fmt(sales.discounts)}`} />
-        <LedgerRow label="Net Sales" value={fmt(sales.netSales)} bold />
+        <SectionTitle>{t('profit.revenue', 'Revenue')}</SectionTitle>
+        <LedgerRow label={t('profit.grossSales', 'Gross Sales')} value={fmt(sales.grossSales)} />
+        <LedgerRow label={t('profit.returns', 'Returns')} value={`-${fmt(sales.refunds)}`} />
+        <LedgerRow label={t('profit.discounts', 'Discounts')} value={`-${fmt(sales.discounts)}`} />
+        <LedgerRow label={t('profit.netSales', 'Net Sales')} value={fmt(sales.netSales)} bold />
         <Divider />
 
         {/* COGS */}
-        <SectionTitle>Cost of Goods Sold (COGS) - Supply Fees</SectionTitle>
-        <LedgerRow label="Ingredient Costs" value={`-${fmt(summary.cogs)}`} />
+        <SectionTitle>{t('profit.cogsTitle', 'Cost of Goods Sold (COGS) - Supply Fees')}</SectionTitle>
+        <LedgerRow label={t('profit.ingredientCosts', 'Ingredient Costs')} value={`-${fmt(summary.cogs)}`} />
         <Divider />
-        <LedgerRow label="Gross Profit" value={fmt(grossProfit)} bold profit={grossProfit >= 0 ? 'positive' : 'negative'} />
+        <LedgerRow label={t('profit.grossProfit', 'Gross Profit')} value={fmt(grossProfit)} bold profit={grossProfit >= 0 ? 'positive' : 'negative'} />
         <Divider />
 
         {/* Operating Expenses */}
-        <SectionTitle>Operating Expenses</SectionTitle>
-        <LedgerRow label="Health Dept Fee" value={`-${fmt(expenses.healthDeptFee)}`} />
-        <LedgerRow label="Event Fee" value={`-${fmt(expenses.eventFee)}`} />
-        <LedgerRow label="Additional Fees" value={`-${fmt(summary.additionalFeesTotal)}`} />
-        <LedgerRow label="Mileage Reimbursement" value={`-${fmt(summary.mileageReimbursement)}`} />
-        <LedgerRow label="Employee Bonus" value={`-${fmt(expenses.employeeBonus)}`} />
-        <LedgerRow label="Event Runner Fees" value={`-${fmt(expenses.eventRunnerFees)}`} />
-        <LedgerRow label="Labor Fees" value={`-${fmt(summary.laborFees)}`} />
-        <LedgerRow label="Coordinator Fee" value={`-${fmt(expenses.coordinatorFee)}`} />
-        <LedgerRow label="POS Fees" value={`-${fmt(summary.posFees)}`} />
+        <SectionTitle>{t('profit.operatingExpenses', 'Operating Expenses')}</SectionTitle>
+        <LedgerRow label={t('profit.healthDeptFee', 'Health Dept Fee')} value={`-${fmt(expenses.healthDeptFee)}`} />
+        <LedgerRow label={t('profit.eventFee', 'Event Fee')} value={`-${fmt(expenses.eventFee)}`} />
+        <LedgerRow label={t('profit.additionalFees', 'Additional Fees')} value={`-${fmt(summary.additionalFeesTotal)}`} />
+        <LedgerRow label={t('profit.mileageReimbursement', 'Mileage Reimbursement')} value={`-${fmt(summary.mileageReimbursement)}`} />
+        <LedgerRow label={t('profit.employeeBonus', 'Employee Bonus')} value={`-${fmt(expenses.employeeBonus)}`} />
+        <LedgerRow label={t('profit.eventRunnerFees', 'Event Runner Fees')} value={`-${fmt(expenses.eventRunnerFees)}`} />
+        <LedgerRow label={t('profit.laborFees', 'Labor Fees')} value={`-${fmt(summary.laborFees)}`} />
+        <LedgerRow label={t('profit.coordinatorFee', 'Coordinator Fee')} value={`-${fmt(expenses.coordinatorFee)}`} />
+        <LedgerRow label={t('profit.posFees', 'POS Fees')} value={`-${fmt(summary.posFees)}`} />
         <Divider />
-        <LedgerRow label="Total Operating Expenses" value={`-${fmt(summary.totalExpenses)}`} bold />
+        <LedgerRow label={t('profit.totalOperatingExpenses', 'Total Operating Expenses')} value={`-${fmt(summary.totalExpenses)}`} bold />
         <Divider />
-        <LedgerRow label="Net Profit" value={fmt(netProfit)} final profit={netProfit >= 0 ? 'positive' : 'negative'} />
+        <LedgerRow label={t('profit.netProfit', 'Net Profit')} value={fmt(netProfit)} final profit={netProfit >= 0 ? 'positive' : 'negative'} />
 
         {/* Labor warning */}
         {Number(summary.laborFees ?? 0) === 0 && (
           <div className="flex items-center gap-2 bg-[#fffbeb] border border-[#f59e0b] rounded-md px-3 py-2 my-2 text-[0.85rem] text-[#92400e]">
             <span>⚠️</span>
-            <span>Labor not yet entered — profit may change. Add labor in the Labor card above.</span>
+            <span>{t('profit.laborWarning', 'Labor not yet entered — profit may change. Add labor in the Labor card above.')}</span>
           </div>
         )}
 
@@ -181,7 +190,7 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
 
         {/* For Your Records */}
         <div className="flex items-center justify-between mb-1.5">
-          <div className="text-[0.72rem] font-bold uppercase tracking-[0.06em] text-[#64748b]">For Your Records</div>
+          <div className="text-[0.72rem] font-bold uppercase tracking-[0.06em] text-[#64748b]">{t('profit.forYourRecords', 'For Your Records')}</div>
           {!isFinalized && (
             <button
               className="btn-primary"
@@ -190,15 +199,15 @@ export function ProfitSummaryCard({ eventId, isFinalized, sales, expenses, summa
               disabled={loading}
             >
               {loading && <span className="spinner" />}
-              <span>✅ Finalize Event</span>
+              <span>{t('profit.finalizeEvent', '✅ Finalize Event')}</span>
             </button>
           )}
         </div>
-        <LedgerRow label="Tips (pass-through to staff)" value={fmt(summary.tips)} info />
+        <LedgerRow label={t('profit.tips', 'Tips (pass-through to staff)')} value={fmt(summary.tips)} info />
         <LedgerRow label={stateLabel} value={fmt(stateTax)} info />
         <LedgerRow label={localLabel} value={fmt(localTax)} info />
-        <LedgerRow label="Total sales tax collected (to remit)" value={fmt(taxCollected)} info />
-        <p className="text-[0.76rem] text-[#64748b] mt-[7px]">ⓘ Sales tax is collected on behalf of the taxing authorities and excluded from profit. Income taxes are calculated annually — consult your accountant.</p>
+        <LedgerRow label={t('profit.totalSalesTaxCollected', 'Total sales tax collected (to remit)')} value={fmt(taxCollected)} info />
+        <p className="text-[0.76rem] text-[#64748b] mt-[7px]">{t('profit.taxDisclaimer', 'ⓘ Sales tax is collected on behalf of the taxing authorities and excluded from profit. Income taxes are calculated annually — consult your accountant.')}</p>
       </div>
     </CollapsibleCard>
   );

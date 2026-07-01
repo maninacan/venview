@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client/core';
 import { useCurrentCompany } from '../../hooks/useCurrentCompany';
 import { showToast } from '@org/data';
+import { formatDate } from '../../i18n/format';
 
 const GET_EVENTS = gql`
   query GetEventsForRestock($companyId: ID!) {
@@ -34,6 +36,7 @@ interface EventInventoryItem {
 }
 
 export function RestockPage() {
+  const { t } = useTranslation('restock');
   const { companyId } = useCurrentCompany();
   const [selectedEventId, setSelectedEventId] = useState('');
   const [restockingId, setRestockingId] = useState<string | null>(null);
@@ -52,15 +55,15 @@ export function RestockPage() {
 
   async function handleRestock(item: EventInventoryItem) {
     const qty = parseFloat(restockQty[item.id] ?? String(Math.max(0, item.quantityLoaded - item.quantityRemaining)));
-    if (!qty || qty <= 0) { showToast('Enter a valid restock quantity', 'error'); return; }
+    if (!qty || qty <= 0) { showToast(t('toast.invalidQty', 'Enter a valid restock quantity'), 'error'); return; }
     setRestockingId(item.id);
     try {
       await restockItem({ variables: { eventId: selectedEventId, eventInventoryId: item.id, quantity: qty } });
-      showToast(`✅ Restocked ${qty} units of ${item.item.name}`, 'success');
+      showToast(t('toast.restocked', '✅ Restocked {{qty}} units of {{name}}', { qty, name: item.item.name }), 'success');
       setRestockQty(prev => { const n = { ...prev }; delete n[item.id]; return n; });
       refetch();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to restock', 'error');
+      showToast(err instanceof Error ? err.message : t('toast.restockFailed', 'Failed to restock'), 'error');
     } finally { setRestockingId(null); }
   }
 
@@ -68,34 +71,36 @@ export function RestockPage() {
     <>
       <div className="card">
         <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}><i className="fa-solid fa-arrows-rotate" /> Restock List</h2>
+          <h2 style={{ margin: '0 0 4px', color: 'var(--vv-navy)' }}><i className="fa-solid fa-arrows-rotate" /> {t('heading', 'Restock List')}</h2>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.86rem' }}>
-            Pick an event, then mark items restocked after refilling. Restocking adds quantity back to your warehouse stock.
+            {t('subtitle', 'Pick an event, then mark items restocked after refilling. Restocking adds quantity back to your warehouse stock.')}
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <label>Event</label>
+            <label>{t('event', 'Event')}</label>
             <select value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>
-              <option value="">Select an event…</option>
+              <option value="">{t('selectEvent', 'Select an event…')}</option>
               {events.map((e: { id: string; eventName: string; eventDate?: string }) => (
-                <option key={e.id} value={e.id}>{e.eventName}{e.eventDate ? ` (${new Date(e.eventDate + 'T00:00:00').toLocaleDateString()})` : ''}</option>
+                <option key={e.id} value={e.id}>{e.eventName}{e.eventDate ? ` (${formatDate(e.eventDate)})` : ''}</option>
               ))}
             </select>
           </div>
           {selectedEventId && (
-            <button className="btn-secondary" onClick={() => refetch()} style={{ marginTop: 20 }}>↻ Refresh</button>
+            <button className="btn-secondary" onClick={() => refetch()} style={{ marginTop: 20 }}>{t('refresh', '↻ Refresh')}</button>
           )}
           {selectedEventId && eventInventory.length > 0 && (
             <span style={{ marginTop: 20, fontSize: '0.82rem', color: lowItems.length > 0 ? '#92400e' : 'var(--muted)' }}>
-              {lowItems.length > 0 ? `⚠️ ${lowItems.length} item(s) running low` : `${eventInventory.length} items tracked`}
+              {lowItems.length > 0
+                ? t('lowWarning', '⚠️ {{count}} items running low', { count: lowItems.length })
+                : t('itemsTracked', '{{count}} items tracked', { count: eventInventory.length })}
             </span>
           )}
         </div>
 
         {!selectedEventId && (
-          <p style={{ color: 'var(--muted)', fontSize: '0.88rem', padding: '16px 0' }}>Select an event above to see its restock list.</p>
+          <p style={{ color: 'var(--muted)', fontSize: '0.88rem', padding: '16px 0' }}>{t('selectPrompt', 'Select an event above to see its restock list.')}</p>
         )}
 
         {selectedEventId && loading && (
@@ -106,7 +111,7 @@ export function RestockPage() {
 
         {selectedEventId && !loading && eventInventory.length === 0 && (
           <p style={{ color: 'var(--muted)', fontSize: '0.88rem', padding: '16px 0' }}>
-            No truck inventory loaded for this event. Add inventory from the Event Dashboard.
+            {t('noInventory', 'No truck inventory loaded for this event. Add inventory from the Event Dashboard.')}
           </p>
         )}
 
@@ -134,7 +139,7 @@ export function RestockPage() {
                   <div style={{ flex: 1, minWidth: 140 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.item.name}</div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: 2 }}>
-                      Loaded: {item.quantityLoaded} · Sold: {item.quantitySold} · Remaining: <strong style={{ color: isLow ? '#92400e' : undefined }}>{item.quantityRemaining.toFixed(2)}</strong>
+                      {t('loaded', 'Loaded')}: {item.quantityLoaded} · {t('sold', 'Sold')}: {item.quantitySold} · {t('remaining', 'Remaining')}: <strong style={{ color: isLow ? '#92400e' : undefined }}>{item.quantityRemaining.toFixed(2)}</strong>
                     </div>
                     {/* Stock bar */}
                     <div style={{ height: 4, background: '#e2e8f0', borderRadius: 2, marginTop: 6, width: 120 }}>
@@ -144,7 +149,7 @@ export function RestockPage() {
 
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div>
-                      <label style={{ fontSize: '0.75rem', marginBottom: 2 }}>Restock qty</label>
+                      <label style={{ fontSize: '0.75rem', marginBottom: 2 }}>{t('restockQty', 'Restock qty')}</label>
                       <input
                         type="number"
                         step="0.01"
@@ -160,7 +165,7 @@ export function RestockPage() {
                       onClick={() => handleRestock(item)}
                     >
                       {restockingId === item.id && <span className="spinner" />}
-                      <span>✅ Mark Restocked</span>
+                      <span>{t('markRestocked', '✅ Mark Restocked')}</span>
                     </button>
                   </div>
                 </div>
