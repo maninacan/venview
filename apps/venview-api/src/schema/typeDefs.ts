@@ -461,6 +461,27 @@ export const typeDefs = `#graphql
     memberCount: Int!
   }
 
+  type AdminCompanyMember {
+    userId: ID!
+    email: String!
+    role: String!
+    "'active' or 'pending' (awaiting approval)."
+    status: String!
+    joinedAt: String
+  }
+
+  type AdminCompanyDetail {
+    id: ID!
+    name: String!
+    plan: String!
+    ownerId: ID
+    ownerEmail: String
+    createdAt: String
+    "Count of active members."
+    memberCount: Int!
+    members: [AdminCompanyMember!]!
+  }
+
   type WaitlistSignup {
     id: ID!
     email: String!
@@ -555,6 +576,7 @@ export const typeDefs = `#graphql
     eventInventory(eventId: ID!): [EventInventory!]!
 
     adminUsers: [AdminUser!]!
+    adminCompanies: [AdminCompanyDetail!]!
     adminDashboard: AdminDashboard!
     companiesInState(state: String!): [CompanyLocation!]!
     waitlistSignups: [WaitlistSignup!]!

@@ -315,6 +315,47 @@ export const adminResolvers = {
       }));
     },
 
+    adminCompanies: async (_: unknown, __: unknown, ctx: AppContext) => {
+      requireAuth(ctx);
+      if (!ctx.isSuperAdmin) throw new Error('Forbidden');
+
+      const [{ data: companies }, { data: members }, { data: { users: authUsers } }] = await Promise.all([
+        supabase.from('Companies').select('id, name, plan, ownerId, createdAt'),
+        supabase.from('CompanyMembers').select('companyId, userId, role, status, joinedAt'),
+        supabase.auth.admin.listUsers({ perPage: 1000 }),
+      ]);
+
+      const emailMap = new Map((authUsers ?? []).map(u => [u.id, u.email ?? '']));
+
+      // Group members by company
+      const membersByCompany = new Map<string, Array<Record<string, unknown>>>();
+      for (const m of (members ?? []) as Array<Record<string, unknown>>) {
+        const cid = m['companyId'] as string;
+        if (!membersByCompany.has(cid)) membersByCompany.set(cid, []);
+        membersByCompany.get(cid)!.push({
+          userId: m['userId'],
+          email: emailMap.get(m['userId'] as string) ?? '',
+          role: m['role'],
+          status: m['status'] ?? 'active',
+          joinedAt: m['joinedAt'],
+        });
+      }
+
+      return ((companies ?? []) as Array<Record<string, unknown>>).map(c => {
+        const mem = membersByCompany.get(c['id'] as string) ?? [];
+        return {
+          id: c['id'],
+          name: c['name'],
+          plan: c['plan'],
+          ownerId: c['ownerId'],
+          ownerEmail: emailMap.get(c['ownerId'] as string) ?? '',
+          createdAt: c['createdAt'],
+          memberCount: mem.filter(m => m['status'] === 'active').length,
+          members: mem,
+        };
+      });
+    },
+
     waitlistSignups: async (_: unknown, __: unknown, ctx: AppContext) => {
       requireAuth(ctx);
       if (!ctx.isSuperAdmin) throw new Error('Forbidden');
