@@ -87,6 +87,11 @@ export function buildDateWindow(event: PosEvent): { startAt: string; endAt: stri
   if (!startDate) throw new Error('Event has no date set');
   const start = new Date(startDate + 'T00:00:00Z');
   const end = new Date((endDate ?? startDate) + 'T00:00:00Z');
+  // Guard against invalid / corrupt dates (e.g. a stray pre-2000 day) so we
+  // surface a clear message instead of a raw provider error.
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start.getUTCFullYear() < 2000) {
+    throw new Error("This event has an invalid date. Please check the event's dates in its details and try again.");
+  }
   end.setUTCHours(26);
   return { startAt: start.toISOString(), endAt: end.toISOString() };
 }
